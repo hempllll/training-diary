@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App'
@@ -395,5 +395,50 @@ describe('page transitions', () => {
     expect(motion()).toBe('forward')
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(motion()).toBe('back')
+  })
+})
+
+describe('swiping between tabs', () => {
+  const current = () => within(nav()).getByRole('button', { current: 'page' }).textContent
+  const swipe = (el: Element, from: number, to: number, dy = 0) => {
+    fireEvent.touchStart(el, { touches: [{ clientX: from, clientY: 300 }] })
+    fireEvent.touchEnd(el, { changedTouches: [{ clientX: to, clientY: 300 + dy }] })
+  }
+
+  it('moves to the neighbouring tab across the screen', async () => {
+    const { user } = await renderApp()
+    const main = () => screen.getByRole('main')
+    swipe(main(), 300, 100)
+    expect(current()).toBe('Exercises')
+    swipe(main(), 300, 100)
+    expect(current()).toBe('Plans')
+    swipe(main(), 300, 100) // no tab after Plans
+    expect(current()).toBe('Plans')
+    swipe(main(), 100, 300)
+    expect(current()).toBe('Exercises')
+
+    swipe(main(), 300, 250) // too short
+    swipe(main(), 300, 100, 200) // mostly scrolling
+    swipe(screen.getByRole('textbox', { name: 'New exercise name' }), 300, 100) // in a field
+    expect(current()).toBe('Exercises')
+
+    // Opened screens don't switch tabs.
+    await user.click(screen.getByText('Bench press'))
+    swipe(main(), 300, 100)
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+  })
+
+  it('drags the highlight along the tab bar', async () => {
+    await renderApp()
+    const bar = nav()
+    bar.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect
+    fireEvent.pointerDown(bar, { clientX: 50, pointerId: 1 })
+    fireEvent.pointerMove(bar, { clientX: 150, pointerId: 1 })
+    expect(bar).toHaveClass('dragging')
+    expect(bar.style.getPropertyValue('--tab')).toBe('1')
+    fireEvent.pointerMove(bar, { clientX: 260, pointerId: 1 })
+    fireEvent.pointerUp(bar, { clientX: 260, pointerId: 1 })
+    expect(current()).toBe('Plans')
+    expect(bar).not.toHaveClass('dragging')
   })
 })

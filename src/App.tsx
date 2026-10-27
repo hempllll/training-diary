@@ -26,6 +26,7 @@ import {
   type TrainingDay,
 } from './diary'
 import { useDiary } from './hooks/useDiary'
+import { useSwipe } from './hooks/useSwipe'
 import { exportDiary, LocalStorageDiaryRepository, type DiaryRepository } from './storage'
 import { downloadText } from './ui/download'
 import { formatDate } from './ui/format'
@@ -118,6 +119,17 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
     scrollPositions.current.set(scrollKey(view), window.scrollY)
     setNav((cur) => ({ view: next, motion: motionBetween(cur.view, next), seq: cur.seq + 1 }))
   }
+
+  function selectTab(tab: Tab) {
+    setMessage(null)
+    navigate(TAB_VIEW[tab])
+  }
+
+  // On a tab's main screen, swiping across it moves to the neighbouring tab.
+  const swipe = useSwipe((step) => {
+    const next = TAB_ORDER[TAB_ORDER.indexOf(TAB_OF[view.name]) + step]
+    if (next) selectTab(next)
+  })
 
   if (loadError) return <LoadErrorScreen error={loadError} today={localDate(now())} />
   if (!diary) return <p className="notice loading">Loading…</p>
@@ -277,6 +289,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
 
   return (
     <div className={focused ? 'app' : 'app has-tab-bar'}>
+      <div className="status-cap" aria-hidden="true" />
       {!focused && (
         <header className="app-header">
           <h1>Training Diary</h1>
@@ -295,20 +308,14 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
         </p>
       )}
 
-      <main>
+      <main {...(DEPTH[view.name] === 0 ? swipe : {})}>
         <div key={nav.seq} className="page" data-motion={nav.motion}>
           {renderScreen(diary)}
         </div>
       </main>
 
       {!focused && (
-        <NavBar
-          tab={TAB_OF[view.name]}
-          onSelect={(tab) => {
-            setMessage(null)
-            navigate(TAB_VIEW[tab])
-          }}
-        />
+        <NavBar tab={TAB_OF[view.name]} onSelect={selectTab} />
       )}
 
       {backupOpen && (
