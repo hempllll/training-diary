@@ -8,14 +8,30 @@
  * training day) atomic.
  */
 import { emptyDiary, type ActiveWorkout, type Diary } from '../diary'
-import { parseDiary } from './diaryIO'
+import { errorText } from '../ui/format'
+import { FORMAT_VERSION, readDiary, serializeDiary } from './diaryIO'
 
 export interface DiaryRepository {
+  /** Throws `DiaryLoadError` if stored data exists but can't be read. */
   load(): Promise<Diary>
   save(diary: Diary): Promise<void>
   /** The workout being logged, if any. Kept apart from the diary until finished. */
   loadActive(): Promise<ActiveWorkout | null>
   saveActive(active: ActiveWorkout | null): Promise<void>
+}
+
+/**
+ * Stored data that couldn't be read. The app stops instead of starting with an
+ * empty diary, which would overwrite the user's data on the next save.
+ */
+export class DiaryLoadError extends Error {
+  /** The stored text, so the user can still download it. */
+  readonly raw: string
+
+  constructor(message: string, raw: string) {
+    super(message)
+    this.raw = raw
+  }
 }
 
 /** In-memory repository, for tests and ephemeral use. */
@@ -45,8 +61,10 @@ export class InMemoryDiaryRepository implements DiaryRepository {
   }
 }
 
-const DIARY_KEY = 'training-diary.diary'
-const ACTIVE_KEY = 'training-diary.active'
+export const DIARY_KEY = 'training-diary.diary'
+export const ACTIVE_KEY = 'training-diary.active'
+/** Where the stored copy written by an older version is kept, e.g. `…backup.v1`. */
+export const backupKey = (version: number) => `training-diary.backup.v${version}`
 
 /**
  * localStorage-backed repository. localStorage works in an installed iOS PWA
@@ -62,15 +80,22 @@ export class LocalStorageDiaryRepository implements DiaryRepository {
   async load(): Promise<Diary> {
     const raw = this.storage.getItem(DIARY_KEY)
     if (!raw) return emptyDiary()
+    let read: ReturnType<typeof readDiary>
     try {
-      return parseDiary(raw)
-    } catch {
-      return emptyDiary() // corrupt data — start clean rather than crash
+      read = readDiary(raw)
+    } catch (err) {
+      throw new DiaryLoadError(errorText(err), raw)
     }
+    // Data from an older version is rewritten in the new format on the next
+    // save. Keep the original once, as a safety net.
+    if (read.version < FORMAT_VERSION && this.storage.getItem(backupKey(read.version)) === null) {
+      this.storage.setItem(backupKey(read.version), raw)
+    }
+    return read.diary
   }
 
   async save(diary: Diary): Promise<void> {
-    this.storage.setItem(DIARY_KEY, JSON.stringify(diary))
+    this.storage.setItem(DIARY_KEY, serializeDiary(diary))
   }
 
   async loadActive(): Promise<ActiveWorkout | null> {

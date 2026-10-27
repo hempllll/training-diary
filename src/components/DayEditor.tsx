@@ -4,7 +4,7 @@ import { ConfirmButton } from './ConfirmButton'
 import { ExercisePicker } from './ExercisePicker'
 
 interface DayEditorProps {
-  /** null = create a new training day. */
+  /** null = create a new plan. */
   day: TrainingDay | null
   diary: Diary
   onSave: (day: TrainingDay) => void
@@ -15,8 +15,8 @@ interface DayEditorProps {
 }
 
 /**
- * Edit a training day's name and its ordered exercise list. Changes are a
- * draft until Save, so Cancel leaves the stored day untouched.
+ * Edit a plan's name and its ordered exercise list. Changes are a draft until
+ * Save, so Cancel leaves the stored plan untouched.
  */
 export function DayEditor({ day, diary, onSave, onDelete, onCancel, createExercise }: DayEditorProps) {
   const [name, setName] = useState(day?.name ?? '')
@@ -48,7 +48,7 @@ export function DayEditor({ day, diary, onSave, onDelete, onCancel, createExerci
         <button type="button" className="back" onClick={onCancel} aria-label="Back">
           ‹
         </button>
-        <h2>{day ? `Edit ${day.name}` : 'New training day'}</h2>
+        <h2>{day ? `Edit ${day.name}` : 'New plan'}</h2>
       </div>
 
       <label className="field">
@@ -128,8 +128,8 @@ export function DayEditor({ day, diary, onSave, onDelete, onCancel, createExerci
       {onDelete && (
         <div className="actions end">
           <ConfirmButton
-            label="Delete training day"
-            question="Delete it? Past workouts are kept."
+            label="Delete plan"
+            question="Delete it? Tracked training days are kept."
             confirmLabel="Delete"
             onConfirm={onDelete}
           />

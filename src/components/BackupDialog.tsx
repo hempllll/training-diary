@@ -12,7 +12,7 @@ interface BackupDialogProps {
 }
 
 const counts = (d: Diary) =>
-  `${plural(d.exercises.length, 'exercise')}, ${plural(d.days.length, 'training day')}, ${plural(d.workouts.length, 'workout')}`
+  `${plural(d.exercises.length, 'exercise')}, ${plural(d.days.length, 'plan')}, ${plural(d.workouts.length, 'tracked training day')}`
 
 /**
  * Export the diary to a JSON file, or restore one. The installed iPhone app

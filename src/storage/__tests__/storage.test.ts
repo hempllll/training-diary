@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ActiveWorkout, Diary } from '../../diary'
 import { fakeStorage } from '../../test/fakeStorage'
-import { exportDiary, LocalStorageDiaryRepository, parseDiary } from '..'
+import { exportDiary, FORMAT_VERSION, LocalStorageDiaryRepository, parseDiary } from '..'
 
 const diary: Diary = {
   exercises: [{ id: 'bench', name: 'Bench press' }],
@@ -28,7 +28,7 @@ const diary: Diary = {
 describe('export / import', () => {
   it('round-trips the diary', () => {
     const text = exportDiary(diary)
-    expect(JSON.parse(text)).toMatchObject({ format: 'training-diary/diary', version: 1 })
+    expect(JSON.parse(text)).toMatchObject({ format: 'training-diary/diary', version: FORMAT_VERSION })
     expect(parseDiary(text)).toEqual(diary)
   })
 
@@ -44,6 +44,15 @@ describe('export / import', () => {
     ],
   ])('rejects %s', (text, message) => {
     expect(() => parseDiary(text)).toThrow(message)
+  })
+
+  it('rejects bad new fields', () => {
+    const bad = structuredClone(diary) as unknown as { exercises: { description: unknown }[]; workouts: { bodyWeight: unknown }[] }
+    bad.exercises[0].description = 42
+    expect(() => parseDiary(JSON.stringify(bad))).toThrow('exercises[0].description must be text')
+    bad.exercises[0].description = 'Seat 4'
+    bad.workouts[0].bodyWeight = 0
+    expect(() => parseDiary(JSON.stringify(bad))).toThrow('workouts[0].bodyWeight must be a number > 0')
   })
 
   it('rejects bad sets with the path to the problem', () => {
@@ -73,12 +82,9 @@ describe('LocalStorageDiaryRepository', () => {
     expect(await again.loadActive()).toBeNull()
   })
 
-  it('starts clean on corrupt data', async () => {
+  it('drops a corrupt workout in progress', async () => {
     const storage = fakeStorage()
-    storage.setItem('training-diary.diary', '{oops')
     storage.setItem('training-diary.active', '"nope"')
-    const repo = new LocalStorageDiaryRepository(storage)
-    expect(await repo.load()).toEqual({ exercises: [], days: [], workouts: [] })
-    expect(await repo.loadActive()).toBeNull()
+    expect(await new LocalStorageDiaryRepository(storage).loadActive()).toBeNull()
   })
 })

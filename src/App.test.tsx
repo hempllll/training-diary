@@ -3,7 +3,18 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App'
 import type { Diary } from './diary'
-import { InMemoryDiaryRepository } from './storage'
+import v1Active from './storage/__tests__/fixtures/v1-stored-active.json?raw'
+import v1Diary from './storage/__tests__/fixtures/v1-stored-diary.json?raw'
+import {
+  ACTIVE_KEY,
+  backupKey,
+  DIARY_KEY,
+  FORMAT_VERSION,
+  InMemoryDiaryRepository,
+  LocalStorageDiaryRepository,
+  readDiary,
+} from './storage'
+import { fakeStorage } from './test/fakeStorage'
 
 const NOW = new Date(2026, 9, 27, 18, 0) // Tue 27 Oct 2026
 
@@ -56,7 +67,7 @@ describe('home screen', () => {
     expect(workoutCards()).toEqual(['Pull', 'Push'])
     expect(screen.getByText('2 × 10 @ 60 kg')).toBeInTheDocument()
 
-    const filters = screen.getByRole('group', { name: 'Show training days' })
+    const filters = screen.getByRole('group', { name: 'Show plans' })
     await user.click(within(filters).getByRole('button', { name: 'Push' }))
     expect(workoutCards()).toEqual(['Push'])
     await user.click(within(filters).getByRole('button', { name: 'Pull' }))
@@ -71,16 +82,16 @@ describe('home screen', () => {
     expect(screen.getByRole('heading', { name: /Pull/ })).toBeInTheDocument()
     expect(screen.getByText('50 kg × 10')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Delete' }))
-    await user.click(within(screen.getByRole('group', { name: 'Delete this workout?' })).getByRole('button', { name: 'Delete' }))
-    expect(screen.getByText('Workout deleted.')).toBeInTheDocument()
+    await user.click(within(screen.getByRole('group', { name: 'Delete this training day?' })).getByRole('button', { name: 'Delete' }))
+    expect(screen.getByText('Training day deleted.')).toBeInTheDocument()
     expect((await repo.load()).workouts.map((w) => w.id)).toEqual(['w-push'])
   })
 })
 
-describe('logging a workout', () => {
+describe('tracking a training day', () => {
   it('steps through the exercises, replaces and adds one, and saves', async () => {
     const { user, repo } = await renderApp()
-    await user.click(screen.getByRole('button', { name: 'Start workout' }))
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Push/ }))
 
     // Bench press, pre-filled from last time.
@@ -110,9 +121,9 @@ describe('logging a workout', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Barbell row' }))
     expect(screen.getByText('Exercise 3 of 3')).toBeInTheDocument()
     expect(screen.getByLabelText('Set 1 weight (kg)')).toHaveValue('50') // from Pull day
-    await user.click(screen.getByRole('button', { name: 'Finish workout' }))
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
 
-    expect(screen.getByText('Saved Push workout.')).toBeInTheDocument()
+    expect(screen.getByText('Saved Push (Tue 27 Oct).')).toBeInTheDocument()
     const stored = await repo.load()
     const saved = stored.workouts.find((w) => w.date === '2026-10-27')!
     expect(saved.entries.map((e) => [e.exerciseName, e.sets])).toEqual([
@@ -131,15 +142,15 @@ describe('logging a workout', () => {
 
   it('keeps an unfinished workout to resume later', async () => {
     const { user, repo } = await renderApp()
-    await user.click(screen.getByRole('button', { name: 'Start workout' }))
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Pull/ }))
-    await user.click(screen.getByRole('button', { name: 'Leave workout' }))
+    await user.click(screen.getByRole('button', { name: 'Leave' }))
 
     expect(await repo.loadActive()).toMatchObject({ workout: { dayName: 'Pull' } })
-    await user.click(screen.getByRole('button', { name: 'Resume workout: Pull' }))
-    await user.click(screen.getByRole('button', { name: 'Discard workout' }))
+    await user.click(screen.getByRole('button', { name: 'Resume: Pull' }))
+    await user.click(screen.getByRole('button', { name: 'Discard training day' }))
     await user.click(screen.getByRole('button', { name: 'Discard' }))
-    expect(screen.getByRole('button', { name: 'Start workout' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Track a training day' })).toBeInTheDocument()
     expect(await repo.loadActive()).toBeNull()
     expect((await repo.load()).workouts).toHaveLength(2)
   })
@@ -147,11 +158,11 @@ describe('logging a workout', () => {
   it('edits a saved workout in place', async () => {
     const { user, repo } = await renderApp()
     await user.click(screen.getByText('Barbell row'))
-    await user.click(screen.getByRole('button', { name: 'Edit workout' }))
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
     const reps = screen.getByLabelText('Set 1 reps')
     await user.clear(reps)
     await user.type(reps, '12')
-    await user.click(screen.getByRole('button', { name: 'Save workout' }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
     expect(screen.getByText('50 kg × 12')).toBeInTheDocument()
     const workouts = (await repo.load()).workouts
     expect(workouts).toHaveLength(2)
@@ -172,15 +183,23 @@ describe('exercises tab', () => {
     expect(screen.getByText('Squat')).toBeInTheDocument()
 
     await user.click(screen.getByText('Bench press'))
-    expect(screen.getByText('In training days: Push')).toBeInTheDocument()
+    expect(screen.getByText('In plans: Push')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Top weight over time, 1 workouts' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Est. 1RM' }))
     expect(screen.getByText('Best est. 1rm: 80 kg (Tue 20 Oct)')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Rename' }))
-    await user.clear(screen.getByLabelText('Exercise name'))
-    await user.type(screen.getByLabelText('Exercise name'), 'Flat bench{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.clear(screen.getByLabelText('Name'))
+    await user.type(screen.getByLabelText('Name'), 'Flat bench')
+    await user.type(screen.getByLabelText('Description'), 'Bench height 3{Enter}Rack pins at 5')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByRole('heading', { name: 'Flat bench' })).toBeInTheDocument()
+    expect(screen.getByText(/Bench height 3\s+Rack pins at 5/)).toBeInTheDocument()
+    expect((await repo.load()).exercises.find((e) => e.id === 'bench')).toEqual({
+      id: 'bench',
+      name: 'Flat bench',
+      description: 'Bench height 3\nRack pins at 5',
+    })
 
     await user.click(screen.getByRole('button', { name: 'Delete exercise' }))
     await user.click(screen.getByRole('button', { name: 'Delete' }))
@@ -191,11 +210,11 @@ describe('exercises tab', () => {
   })
 })
 
-describe('training days tab', () => {
-  it('creates a training day from scratch, ordering its exercises', async () => {
+describe('plans tab', () => {
+  it('creates a plan from scratch, ordering its exercises', async () => {
     const { user, repo } = await renderApp({ exercises: [], days: [], workouts: [] })
-    expect(screen.getByText(/Create a training day/)).toBeInTheDocument()
-    await user.click(within(nav()).getByRole('button', { name: /Training days/ }))
+    expect(screen.getByText(/Create a plan/)).toBeInTheDocument()
+    await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
     await user.click(screen.getByRole('button', { name: '+ New' }))
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -218,9 +237,9 @@ describe('training days tab', () => {
     expect(stored.days[0].exerciseIds.map((id) => byId.get(id))).toEqual(['Leg curl', 'Squat'])
   })
 
-  it('removes an exercise from a day and cancels without saving', async () => {
+  it('removes an exercise from a plan and cancels without saving', async () => {
     const { user, repo } = await renderApp()
-    await user.click(within(nav()).getByRole('button', { name: /Training days/ }))
+    await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
     await user.click(screen.getByText('Push'))
     await user.click(screen.getByRole('button', { name: 'Remove Bench press' }))
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -230,5 +249,92 @@ describe('training days tab', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Bench press' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect((await repo.load()).days[0].exerciseIds).toEqual(['incline'])
+  })
+})
+
+describe('body weight', () => {
+  it('is entered while tracking, hinted from last time, and shown afterwards', async () => {
+    const diary = structuredClone(seeded)
+    diary.workouts[0].bodyWeight = 82.5
+    const { user, repo } = await renderApp(diary)
+    expect(screen.getByText('Body weight 82.5 kg')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Pull/ }))
+    const field = screen.getByLabelText('Body weight (kg)')
+    expect(field).toHaveValue('')
+    expect(field).toHaveAttribute('placeholder', '82.5')
+    await user.type(field, '81,9')
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+
+    const saved = (await repo.load()).workouts.find((w) => w.date === '2026-10-27')!
+    expect(saved.bodyWeight).toBe(81.9)
+    expect(screen.getByText('Body weight 81.9 kg')).toBeInTheDocument()
+  })
+
+  it('is optional', async () => {
+    const { user, repo } = await renderApp()
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Pull/ }))
+    await user.type(screen.getByLabelText('Body weight (kg)'), '80')
+    await user.clear(screen.getByLabelText('Body weight (kg)'))
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+    const saved = (await repo.load()).workouts.find((w) => w.date === '2026-10-27')!
+    expect(saved).not.toHaveProperty('bodyWeight')
+  })
+})
+
+describe('exercise descriptions', () => {
+  it('are shown while tracking', async () => {
+    const diary = structuredClone(seeded)
+    diary.exercises[0].description = 'Bench height 3'
+    const { user } = await renderApp(diary)
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Push/ }))
+    expect(screen.getByText('Bench height 3')).toBeInTheDocument()
+  })
+})
+
+describe('data stored by an earlier version', () => {
+  async function renderWithStorage(storage: Storage) {
+    render(<App repo={new LocalStorageDiaryRepository(storage)} now={() => NOW} />)
+    return userEvent.setup()
+  }
+
+  it('opens v1 data, keeps it, and upgrades it on the first change', async () => {
+    const storage = fakeStorage()
+    storage.setItem(DIARY_KEY, v1Diary)
+    storage.setItem(ACTIVE_KEY, v1Active)
+    const user = await renderWithStorage(storage)
+
+    await screen.findByRole('heading', { name: 'Training Diary' })
+    expect(screen.getByRole('button', { name: 'Resume: Push' })).toBeInTheDocument()
+    expect(screen.getAllByText(/^(Push|Pull|Legs)$/).map((e) => e.textContent)).toEqual([
+      'Push', 'Pull', 'Legs', // filter chips
+      'Pull', 'Legs', 'Push', // tracked training days, newest first
+    ])
+
+    await user.click(within(nav()).getByRole('button', { name: /Exercises/ }))
+    await user.click(screen.getByText('Dips'))
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.type(screen.getByLabelText('Description'), 'Use the belt')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    const { diary, version } = readDiary(storage.getItem(DIARY_KEY)!)
+    expect(version).toBe(FORMAT_VERSION)
+    const before = JSON.parse(v1Diary) as Diary
+    expect(diary.workouts).toEqual(before.workouts)
+    expect(diary.days).toEqual(before.days)
+    expect(diary.exercises.find((e) => e.id === 'dips')?.description).toBe('Use the belt')
+    expect(storage.getItem(backupKey(1))).toBe(v1Diary)
+  })
+
+  it('shows an error and changes nothing when stored data can’t be read', async () => {
+    const storage = fakeStorage()
+    storage.setItem(DIARY_KEY, '{"exercises": [')
+    await renderWithStorage(storage)
+    expect(await screen.findByRole('heading', { name: 'Your diary couldn’t be loaded' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download stored data' })).toBeInTheDocument()
+    expect(storage.getItem(DIARY_KEY)).toBe('{"exercises": [')
   })
 })

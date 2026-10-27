@@ -1,0 +1,180 @@
+{
+  "format": "training-diary/diary",
+  "version": 2,
+  "exercises": [
+    {
+      "id": "bench",
+      "name": "Bench press",
+      "description": "Bench height 3\nGrip: 81 cm rings"
+    },
+    {
+      "id": "incline",
+      "name": "Incline DB press"
+    },
+    {
+      "id": "dips",
+      "name": "Dips"
+    },
+    {
+      "id": "row",
+      "name": "Barbell row"
+    },
+    {
+      "id": "flys",
+      "name": "Cable flys",
+      "description": "Pulley at the top hole"
+    }
+  ],
+  "days": [
+    {
+      "id": "push",
+      "name": "Push",
+      "exerciseIds": [
+        "bench",
+        "incline",
+        "dips"
+      ]
+    },
+    {
+      "id": "pull",
+      "name": "Pull",
+      "exerciseIds": [
+        "row"
+      ]
+    }
+  ],
+  "workouts": [
+    {
+      "id": "2d887e47-8c72-4f42-9d4c-93b72f4a13f5",
+      "dayId": "push",
+      "dayName": "Push",
+      "date": "2026-10-20",
+      "startedAt": "2026-10-20T16:00:00.000Z",
+      "entries": [
+        {
+          "exerciseId": "bench",
+          "exerciseName": "Bench press",
+          "sets": [
+            {
+              "weight": 60,
+              "reps": 10
+            },
+            {
+              "weight": 62.5,
+              "reps": 8
+            }
+          ]
+        },
+        {
+          "exerciseId": "flys",
+          "exerciseName": "Cable flys",
+          "sets": [
+            {
+              "weight": 15,
+              "reps": 12
+            }
+          ],
+          "replaces": {
+            "exerciseId": "incline",
+            "exerciseName": "Incline DB press"
+          }
+        },
+        {
+          "exerciseId": "dips",
+          "exerciseName": "Dips",
+          "sets": [
+            {
+              "weight": 0,
+              "reps": 12
+            },
+            {
+              "weight": 0,
+              "reps": 10
+            }
+          ]
+        },
+        {
+          "exerciseId": "old",
+          "exerciseName": "Pec deck",
+          "sets": [
+            {
+              "weight": 40,
+              "reps": 10
+            }
+          ]
+        },
+        {
+          "exerciseId": "row",
+          "exerciseName": "Barbell row",
+          "sets": [
+            {
+              "weight": 0,
+              "reps": 10
+            },
+            {
+              "weight": 0,
+              "reps": 10
+            },
+            {
+              "weight": 0,
+              "reps": 10
+            }
+          ],
+          "extra": true
+        }
+      ],
+      "bodyWeight": 82.9
+    },
+    {
+      "id": "8870762b-1025-4631-8b50-f6ba6be8cbc3",
+      "dayId": "legs",
+      "dayName": "Legs",
+      "date": "2026-10-21",
+      "startedAt": "2026-10-21T07:30:00.000Z",
+      "entries": [
+        {
+          "exerciseId": "row",
+          "exerciseName": "Barbell row",
+          "sets": [
+            {
+              "weight": 0,
+              "reps": 10
+            },
+            {
+              "weight": 0,
+              "reps": 10
+            },
+            {
+              "weight": 0,
+              "reps": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "04c6ac0e-c175-4d06-950e-1309e6140d3b",
+      "dayId": "pull",
+      "dayName": "Pull",
+      "date": "2026-10-22",
+      "startedAt": "2026-10-22T17:15:00.000Z",
+      "entries": [
+        {
+          "exerciseId": "row",
+          "exerciseName": "Barbell row",
+          "sets": [
+            {
+              "weight": 50,
+              "reps": 10
+            },
+            {
+              "weight": 52.5,
+              "reps": 8
+            }
+          ]
+        }
+      ],
+      "bodyWeight": 82.4
+    }
+  ]
+}

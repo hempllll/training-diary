@@ -2,16 +2,18 @@ import { useState } from 'react'
 import {
   goTo,
   insertEntry,
+  lastBodyWeight,
   lastEntry,
   removeEntry,
   replaceEntry,
+  setBodyWeight,
   updateSets,
   type ActiveWorkout,
   type Diary,
   type Exercise,
   type SetEntry,
 } from '../diary'
-import { formatDate, summarizeSets } from '../ui/format'
+import { formatDate, formatKg, summarizeSets } from '../ui/format'
 import { ConfirmButton } from './ConfirmButton'
 import { ExercisePicker } from './ExercisePicker'
 import { NumberField } from './NumberField'
@@ -29,9 +31,10 @@ interface WorkoutRunnerProps {
 }
 
 /**
- * Logging a workout: one exercise at a time in the training day's order, with
- * weight and reps per set. Exercises can be replaced, added or removed for
- * this workout only; the training day itself is never changed here.
+ * Tracking a training day: one exercise at a time in the plan's order, with
+ * weight and reps per set, plus the user's body weight that day. Exercises can
+ * be replaced, added or removed for this training day only; the plan itself
+ * is never changed here.
  */
 export function WorkoutRunner({
   active,
@@ -48,6 +51,8 @@ export function WorkoutRunner({
   const entry = entries[current] as (typeof entries)[number] | undefined
   const isLast = current >= entries.length - 1
   const previous = entry ? lastEntry(diary.workouts, entry.exerciseId, workout.id) : null
+  const description = entry && diary.exercises.find((e) => e.id === entry.exerciseId)?.description
+  const lastWeight = lastBodyWeight(diary.workouts, workout.id)
 
   function pick(exercise: Exercise) {
     const history = diary.workouts
@@ -71,20 +76,32 @@ export function WorkoutRunner({
   return (
     <section className="screen runner">
       <div className="view-header">
-        <button type="button" className="back" onClick={onLeave} aria-label="Leave workout">
+        <button type="button" className="back" onClick={onLeave} aria-label="Leave">
           ‹
         </button>
         <h2>{workout.dayName}</h2>
         <input
           className="date-input"
           type="date"
-          aria-label="Workout date"
+          aria-label="Date"
           value={workout.date}
           onChange={(e) =>
             e.target.value && onChange({ ...active, workout: { ...workout, date: e.target.value } })
           }
         />
       </div>
+
+      <label className="body-weight">
+        <span>Body weight</span>
+        <NumberField
+          label="Body weight (kg)"
+          optional
+          value={workout.bodyWeight}
+          placeholder={lastWeight ? formatKg(lastWeight) : 'optional'}
+          onChange={(kg) => onChange(setBodyWeight(active, kg))}
+        />
+        <span>kg</span>
+      </label>
 
       {entries.length > 0 && (
         <ol className="steps" aria-label="Exercises">
@@ -109,7 +126,8 @@ export function WorkoutRunner({
           </span>
           <h3>{entry.exerciseName}</h3>
           {entry.replaces && <span className="row-sub">instead of {entry.replaces.exerciseName}</span>}
-          {entry.extra && !entry.replaces && <span className="row-sub">added to this workout</span>}
+          {entry.extra && !entry.replaces && <span className="row-sub">added for today</span>}
+          {description && <p className="description">{description}</p>}
           <p className="last-time">
             {previous
               ? `Last time (${formatDate(previous.workout.date)}): ${summarizeSets(previous.entry.sets)}`
@@ -135,7 +153,7 @@ export function WorkoutRunner({
                     <NumberField
                       label={`Set ${i + 1} weight (kg)`}
                       value={s.weight}
-                      onChange={(weight) => changeSet(i, { weight })}
+                      onChange={(weight) => changeSet(i, { weight: weight ?? 0 })}
                     />
                   </td>
                   <td>
@@ -143,7 +161,7 @@ export function WorkoutRunner({
                       label={`Set ${i + 1} reps`}
                       integer
                       value={s.reps}
-                      onChange={(reps) => changeSet(i, { reps })}
+                      onChange={(reps) => changeSet(i, { reps: reps ?? 0 })}
                     />
                   </td>
                   <td>
@@ -182,7 +200,7 @@ export function WorkoutRunner({
         </div>
       ) : (
         <div className="empty">
-          <p className="notice">No exercises in this workout.</p>
+          <p className="notice">No exercises yet.</p>
           <button type="button" onClick={() => setPicking('add')}>
             + Add exercise
           </button>
@@ -191,8 +209,8 @@ export function WorkoutRunner({
 
       <div className="actions end">
         <ConfirmButton
-          label={active.editing ? 'Discard changes' : 'Discard workout'}
-          question={active.editing ? 'Discard your changes?' : 'Discard this workout?'}
+          label={active.editing ? 'Discard changes' : 'Discard training day'}
+          question={active.editing ? 'Discard your changes?' : 'Discard this training day?'}
           confirmLabel="Discard"
           onConfirm={onDiscard}
         />
@@ -204,7 +222,7 @@ export function WorkoutRunner({
         </button>
         {isLast ? (
           <button type="button" className="primary" onClick={onFinish}>
-            {active.editing ? 'Save workout' : 'Finish workout'}
+            {active.editing ? 'Save changes' : 'Finish'}
           </button>
         ) : (
           <button type="button" className="primary" onClick={() => onChange(goTo(active, current + 1))}>
@@ -217,8 +235,8 @@ export function WorkoutRunner({
         <ExercisePicker
           title={
             picking === 'replace' && entry
-              ? `Replace ${entry.exerciseName} (this workout only)`
-              : 'Add exercise (this workout only)'
+              ? `Replace ${entry.exerciseName} (today only)`
+              : 'Add exercise (today only)'
           }
           exercises={diary.exercises}
           excludeIds={picking === 'replace' && entry ? [entry.exerciseId] : []}

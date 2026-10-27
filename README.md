@@ -6,13 +6,16 @@ and installs to the iPhone home screen. See [CLAUDE.md](CLAUDE.md).
 
 ## Features
 
-- **Workouts** (home): recorded workouts newest first, filterable by training day.
-  Start a training day and log weight and reps per set for each exercise in order,
-  pre-filled with last time's numbers. Replace or add an exercise for this workout
-  only, leave and resume later, or edit a saved workout.
-- **Exercises**: add, rename and delete exercises; see a progress chart (top weight,
-  estimated 1RM, volume) and the full history of each.
-- **Training days**: create days, rename them, add/remove exercises and change their order.
+- **Training days** (home): tracked training days newest first, filterable by plan.
+  Track a training day from a plan and log weight and reps per set for each exercise
+  in order, pre-filled with last time's numbers, plus your body weight that day.
+  Replace or add an exercise for that day only, leave and resume later, or edit a
+  tracked day.
+- **Exercises**: add, edit (name and description, e.g. machine settings) and delete
+  exercises; see a progress chart (top weight, estimated 1RM, volume) and the full
+  history of each. The description shows while tracking.
+- **Plans**: create plans (e.g. Push, Pull, Legs), rename them, add/remove exercises
+  and change their order.
 - **Backup**: export the whole diary as JSON and restore it from a file.
 
 ## Stack
@@ -32,6 +35,9 @@ npm run lint     # lint with oxlint
 npm run build    # type-check + production build to dist/
 npm run preview  # serve the production build locally
 ```
+
+Stored data must stay compatible with every released version: see "Key rules" in
+[CLAUDE.md](CLAUDE.md) and `src/storage/__tests__/compatibility.test.ts`.
 
 ## Deployment
 
