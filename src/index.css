@@ -1,0 +1,44 @@
+:root {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.4;
+  color-scheme: light dark;
+
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --text: #1a202c;
+  --muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #0b6bcb;
+  /* Text on an accent-coloured background (selected buttons, Save). */
+  --on-accent: #ffffff;
+  --error: #b42318;
+
+  /* Progress chart line, checked for contrast and lightness against the
+     surface in each mode (the dark one is a separate step, not a flip). */
+  --chart-line: #0b6bcb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101317;
+    --surface: #1a1e24;
+    --text: #e6e8eb;
+    --muted: #9aa1ab;
+    --border: #2b3139;
+    --accent: #5aa9ff;
+    --on-accent: #0b1a2b;
+    --error: #ff8a80;
+    --chart-line: #3f95ee;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
