@@ -13,6 +13,12 @@
   --on-accent: #ffffff;
   --error: #b42318;
 
+  /* Frosted-glass tab bar: translucent fill, a faint edge and a top shine. */
+  --glass: rgb(255 255 255 / 0.72);
+  --glass-edge: rgb(0 0 0 / 0.07);
+  --glass-shine: rgb(255 255 255 / 0.7);
+  --glass-selected: rgb(11 107 203 / 0.12);
+
   /* Progress chart line, checked for contrast and lightness against the
      surface in each mode (the dark one is a separate step, not a flip). */
   --chart-line: #0b6bcb;
@@ -28,6 +34,10 @@
     --accent: #5aa9ff;
     --on-accent: #0b1a2b;
     --error: #ff8a80;
+    --glass: rgb(36 41 48 / 0.68);
+    --glass-edge: rgb(255 255 255 / 0.1);
+    --glass-shine: rgb(255 255 255 / 0.08);
+    --glass-selected: rgb(90 169 255 / 0.18);
     --chart-line: #3f95ee;
   }
 }
