@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import './App.css'
+import { AppHeader } from './components/AppHeader'
 import { BackupDialog } from './components/BackupDialog'
 import { DayEditor } from './components/DayEditor'
 import { DaysScreen } from './components/DaysScreen'
@@ -8,6 +9,7 @@ import { ExerciseView } from './components/ExerciseView'
 import { HomeScreen } from './components/HomeScreen'
 import { LoadErrorScreen } from './components/LoadErrorScreen'
 import { NavBar, type Tab } from './components/NavBar'
+import { PlanChooser } from './components/PlanChooser'
 import { WorkoutRunner } from './components/WorkoutRunner'
 import { WorkoutView } from './components/WorkoutView'
 import {
@@ -89,6 +91,9 @@ function motionBetween(from: View, to: View): Motion {
   return step > 0 ? 'next-tab' : step < 0 ? 'prev-tab' : 'fade'
 }
 
+/** How long a notification shows before it fades away (ms). */
+export const TOAST_MS = 3000
+
 /** Identifies a screen for remembering its scroll position. */
 const scrollKey = (v: View) => ('id' in v && v.id ? `${v.name}:${v.id}` : v.name)
 
@@ -105,8 +110,12 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   const view = nav.view
   const scrollPositions = useRef(new Map<string, number>())
   const [filter, setFilter] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [backupOpen, setBackupOpen] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [choosing, setChoosing] = useState(false)
+  // A short notification ("Saved Push"); `seq` restarts it when a new one
+  // replaces one still showing.
+  const [toast, setToast] = useState<{ text: string; seq: number } | null>(null)
 
   // Opened screens start at the top; going back or switching tabs returns to
   // where that screen was left.
@@ -121,9 +130,18 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   }
 
   function selectTab(tab: Tab) {
-    setMessage(null)
     navigate(TAB_VIEW[tab])
   }
+
+  function notify(text: string) {
+    setToast((cur) => ({ text, seq: (cur?.seq ?? 0) + 1 }))
+  }
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), TOAST_MS)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   // On a tab's main screen, swiping across it moves to the neighbouring tab.
   const swipe = useSwipe((step) => {
@@ -146,16 +164,27 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   function handleStart(dayId: string) {
     const day = diary?.days.find((d) => d.id === dayId)
     if (!day || !diary) return
+    setChoosing(false)
     void setActive(startWorkout(day, diary, now()))
     navigate({ name: 'run' })
   }
+
+  // The header's + tracks a training day: it resumes the one in progress, or
+  // asks for a plan first when there is none yet.
+  const add = active
+    ? { label: 'Resume training day', run: () => navigate({ name: 'run' }) }
+    : diary.days.length === 0
+      ? { label: 'New plan', run: () => navigate({ name: 'day', id: null, back: view }) }
+      : { label: 'Track a training day', run: () => setChoosing(true) }
 
   function handleFinish() {
     if (!active) return
     const workout = finishWorkout(active)
     void update((d) => saveWorkout(d, workout))
     void setActive(null)
-    setMessage(`Saved ${workout.dayName} (${formatDate(workout.date)}).`)
+    notify(`Saved ${workout.dayName} (${formatDate(workout.date)}).`)
+    // Show what was just saved.
+    setExpanded((cur) => new Set(cur).add(workout.id))
     navigate(active.editing ? { name: 'workout', id: workout.id } : { name: 'home' })
   }
 
@@ -169,7 +198,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
 
   function handleSaveDay(day: TrainingDay, back: View) {
     void update((d) => saveDay(d, day))
-    setMessage(`Saved ${day.name}.`)
+    notify(`Saved ${day.name}.`)
     navigate(back)
   }
 
@@ -204,7 +233,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
             }}
             onDelete={() => {
               void update((x) => deleteWorkout(x, workout.id))
-              setMessage('Training day deleted.')
+              notify('Training day deleted.')
               navigate({ name: 'home' })
             }}
           />
@@ -223,7 +252,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
             onSave={(changes) => void update((x) => saveExercise(x, { ...exercise, ...changes }))}
             onDelete={() => {
               void update((x) => deleteExercise(x, exercise.id))
-              setMessage(`Deleted ${exercise.name}.`)
+              notify(`Deleted ${exercise.name}.`)
               navigate({ name: 'exercises' })
             }}
           />
@@ -251,7 +280,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
             day
               ? () => {
                   void update((x) => deleteDay(x, day.id))
-                  setMessage(`Deleted ${day.name}.`)
+                  notify(`Deleted ${day.name}.`)
                   navigate({ name: 'days' })
                 }
               : undefined
@@ -276,7 +305,8 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
         active={active}
         filter={filter}
         onFilterChange={setFilter}
-        onStart={handleStart}
+        expanded={expanded}
+        onExpandedChange={setExpanded}
         onResume={() => navigate({ name: 'run' })}
         onOpenWorkout={(id) => navigate({ name: 'workout', id })}
         onCreateDay={() => navigate({ name: 'day', id: null, back: { name: 'home' } })}
@@ -290,21 +320,18 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   return (
     <div className={focused ? 'app' : 'app has-tab-bar'}>
       <div className="status-cap" aria-hidden="true" />
-      {!focused && (
-        <header className="app-header">
-          <h1>Training Diary</h1>
-          <button type="button" onClick={() => setBackupOpen(true)}>
-            Backup
-          </button>
-        </header>
-      )}
+      {!focused && <AppHeader addLabel={add.label} onAdd={add.run} onBackup={() => setBackupOpen(true)} />}
 
-      {message && (
-        <p className="toast" role="status">
-          {message}
-          <button type="button" className="icon" aria-label="Dismiss" onClick={() => setMessage(null)}>
-            ✕
-          </button>
+      {/* Floats over the top right and fades out; a tap dismisses it early. */}
+      {toast && (
+        <p
+          key={toast.seq}
+          className="toast"
+          role="status"
+          style={{ '--toast-ms': `${TOAST_MS}ms` } as CSSProperties}
+          onClick={() => setToast(null)}
+        >
+          {toast.text}
         </p>
       )}
 
@@ -318,6 +345,8 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
         <NavBar tab={TAB_OF[view.name]} onSelect={selectTab} />
       )}
 
+      {choosing && <PlanChooser days={diary.days} onChoose={handleStart} onClose={() => setChoosing(false)} />}
+
       {backupOpen && (
         <BackupDialog
           diary={diary}
@@ -328,7 +357,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
             void update(() => restored)
             setBackupOpen(false)
             setFilter(new Set())
-            setMessage('Backup restored.')
+            notify('Backup restored.')
           }}
           onClose={() => setBackupOpen(false)}
         />

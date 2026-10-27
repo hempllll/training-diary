@@ -27,26 +27,33 @@ export function parseNumber(text: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null
 }
 
-/** One set as "60 kg × 10" (or "10 reps" without weight). */
+/** One set as "10 @ 60 kg" (or "10 reps" without weight). */
 export function formatSet(set: SetEntry): string {
-  return set.weight > 0 ? `${formatKg(set.weight)} kg × ${set.reps}` : `${set.reps} reps`
+  return set.weight > 0 ? `${set.reps} @ ${formatKg(set.weight)} kg` : `${set.reps} reps`
 }
 
 /**
- * Sets in short form: "3 × 10 @ 60 kg" when all sets match, "10 · 10 · 8 @ 60 kg"
- * when only the weight does, otherwise each set listed ("60×10 · 55×8", in kg).
+ * Sets in short form, one group per run of sets at the same weight, in the
+ * order they were done: each set's reps, then the weight ("10 · 10 · 8 @ 60 kg").
+ * Sets without weight have no "@".
  */
-export function summarizeSets(sets: SetEntry[]): string {
-  if (sets.length === 0) return 'No sets'
-  const first = sets[0]
-  if (sets.every((s) => s.weight === first.weight)) {
-    const at = first.weight > 0 ? ` @ ${formatKg(first.weight)} kg` : ''
-    const reps = sets.every((s) => s.reps === first.reps)
-      ? `${sets.length} × ${first.reps}`
-      : sets.map((s) => s.reps).join(' · ')
-    return reps + at
+export function setGroups(sets: SetEntry[]): string[] {
+  const runs: SetEntry[][] = []
+  for (const set of sets) {
+    const run = runs.at(-1)
+    if (run && run[0].weight === set.weight) run.push(set)
+    else runs.push([set])
   }
-  return sets.map((s) => (s.weight > 0 ? `${formatKg(s.weight)}×${s.reps}` : `${s.reps}`)).join(' · ')
+  return runs.map((run) => {
+    const { weight } = run[0]
+    const reps = run.map((s) => s.reps).join(' · ')
+    return weight > 0 ? `${reps} @ ${formatKg(weight)} kg` : reps
+  })
+}
+
+/** `setGroups` on one line: "12 @ 40 kg, 11 · 9 @ 50 kg". */
+export function summarizeSets(sets: SetEntry[]): string {
+  return sets.length === 0 ? 'No sets' : setGroups(sets).join(', ')
 }
 
 /** "1 exercise", "3 exercises". */

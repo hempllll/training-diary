@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatKg, parseNumber, summarizeSets } from '../format'
+import { formatDate, formatKg, parseNumber, setGroups, summarizeSets } from '../format'
 import { niceTicks } from '../ticks'
 
 describe('formatDate', () => {
@@ -20,20 +20,28 @@ describe('parseNumber', () => {
 })
 
 describe('summarizeSets', () => {
-  it('collapses identical sets', () => {
-    expect(summarizeSets([{ weight: 60, reps: 10 }, { weight: 60, reps: 10 }])).toBe('2 × 10 @ 60 kg')
-    expect(summarizeSets([{ weight: 0, reps: 12 }])).toBe('1 × 12')
+  it('lists the reps of each set, then the weight', () => {
+    expect(summarizeSets([{ weight: 60, reps: 10 }, { weight: 60, reps: 10 }])).toBe('10 · 10 @ 60 kg')
+    expect(summarizeSets([{ weight: 70, reps: 10 }, { weight: 70, reps: 8 }])).toBe('10 · 8 @ 70 kg')
+    expect(summarizeSets([{ weight: 62.5, reps: 8 }])).toBe('8 @ 62.5 kg')
   })
 
-  it('lists reps once when only the weight matches', () => {
-    expect(summarizeSets([{ weight: 70, reps: 10 }, { weight: 70, reps: 8 }])).toBe('10 · 8 @ 70 kg')
+  it('has no weight for sets without one', () => {
     expect(summarizeSets([{ weight: 0, reps: 8 }, { weight: 0, reps: 7 }])).toBe('8 · 7')
   })
 
-  it('lists differing sets', () => {
-    expect(summarizeSets([{ weight: 62.5, reps: 8 }, { weight: 60, reps: 10 }, { weight: 0, reps: 5 }])).toBe(
-      '62.5×8 · 60×10 · 5',
-    )
+  it('groups runs of sets at the same weight, in order', () => {
+    const sets = [
+      { weight: 40, reps: 12 },
+      { weight: 50, reps: 11 },
+      { weight: 50, reps: 9 },
+      { weight: 50, reps: 8 },
+      { weight: 40, reps: 10 },
+      { weight: 40, reps: 10 },
+      { weight: 0, reps: 5 },
+    ]
+    expect(setGroups(sets)).toEqual(['12 @ 40 kg', '11 · 9 · 8 @ 50 kg', '10 · 10 @ 40 kg', '5'])
+    expect(summarizeSets(sets)).toBe('12 @ 40 kg, 11 · 9 · 8 @ 50 kg, 10 · 10 @ 40 kg, 5')
   })
 })
 

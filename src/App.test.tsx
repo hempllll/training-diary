@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
-import App from './App'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import App, { TOAST_MS } from './App'
 import type { Diary } from './diary'
 import v1Active from './storage/__tests__/fixtures/v1-stored-active.json?raw'
 import v1Diary from './storage/__tests__/fixtures/v1-stored-diary.json?raw'
@@ -58,14 +58,26 @@ async function renderApp(diary: Diary = seeded) {
 }
 
 const nav = () => screen.getByRole('navigation', { name: 'Main' })
-const workoutCards = () =>
-  screen.getAllByRole('listitem').map((li) => within(li).getAllByText(/^(Push|Pull)$/)[0].textContent)
+/** The plan names on the home screen's cards, top to bottom. */
+const workoutCards = () => [...document.querySelectorAll('.card-toggle .row-title')].map((t) => t.textContent)
+/** Open a home card by its plan name, e.g. /^Pull/. */
+const expandCard = (user: ReturnType<typeof userEvent.setup>, name: RegExp) =>
+  user.click(screen.getByRole('button', { name, expanded: false }))
 
 describe('home screen', () => {
   it('lists workouts newest first and filters by training day', async () => {
     const { user } = await renderApp()
     expect(workoutCards()).toEqual(['Pull', 'Push'])
-    expect(screen.getByText('2 × 10 @ 60 kg')).toBeInTheDocument()
+    // Cards show plan and date; the exercises appear when one is opened.
+    expect(screen.queryByText('Bench press')).not.toBeInTheDocument()
+    await expandCard(user, /^Push/)
+    expect(screen.getByText('Bench press')).toBeInTheDocument()
+    expect(screen.getByText('10 · 10 @ 60 kg')).toBeInTheDocument()
+    await expandCard(user, /^Pull/) // several can be open at once
+    expect(screen.getByText('Bench press')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Push/, expanded: true }))
+    expect(screen.queryByText('Bench press')).not.toBeInTheDocument()
+    expect(screen.getByText('Barbell row')).toBeInTheDocument()
 
     const filters = screen.getByRole('group', { name: 'Show plans' })
     await user.click(within(filters).getByRole('button', { name: 'Push' }))
@@ -78,13 +90,47 @@ describe('home screen', () => {
 
   it('opens a workout and deletes it', async () => {
     const { user, repo } = await renderApp()
-    await user.click(screen.getByText('Barbell row'))
+    await expandCard(user, /^Pull/)
+    await user.click(screen.getByRole('button', { name: 'Details ›' }))
     expect(screen.getByRole('heading', { name: /Pull/ })).toBeInTheDocument()
-    expect(screen.getByText('50 kg × 10')).toBeInTheDocument()
+    expect(screen.getByText('10 @ 50 kg')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     await user.click(within(screen.getByRole('group', { name: 'Delete this training day?' })).getByRole('button', { name: 'Delete' }))
     expect(screen.getByText('Training day deleted.')).toBeInTheDocument()
     expect((await repo.load()).workouts.map((w) => w.id)).toEqual(['w-push'])
+  })
+})
+
+describe('header', () => {
+  it('opens the backup from the settings menu', async () => {
+    const { user } = await renderApp()
+    const gear = screen.getByRole('button', { name: 'Settings' })
+    expect(gear).toHaveAttribute('aria-expanded', 'false')
+    await user.click(gear)
+    expect(gear).toHaveAttribute('aria-expanded', 'true')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    await user.click(gear)
+    await user.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Backup' }))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Backup' })).toBeInTheDocument()
+  })
+
+  it('has + track a training day from any tab, or resume the one in progress', async () => {
+    const { user } = await renderApp()
+    await user.click(within(nav()).getByRole('button', { name: /Exercises/ }))
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Pull/ }))
+    await user.click(screen.getByRole('button', { name: 'Leave' }))
+    await user.click(screen.getByRole('button', { name: 'Resume training day' }))
+    expect(screen.getByRole('button', { name: 'Finish' })).toBeInTheDocument()
+  })
+
+  it('has + create the first plan when there is none', async () => {
+    const { user } = await renderApp({ exercises: [], days: [], workouts: [] })
+    await user.click(screen.getByRole('button', { name: 'New plan' }))
+    expect(screen.getByPlaceholderText('e.g. Push, or Rest day')).toBeInTheDocument()
   })
 })
 
@@ -96,7 +142,7 @@ describe('tracking a training day', () => {
 
     // Bench press, pre-filled from last time.
     expect(screen.getByRole('heading', { name: 'Bench press' })).toBeInTheDocument()
-    expect(screen.getByText('Last time (Tue 20 Oct): 2 × 10 @ 60 kg')).toBeInTheDocument()
+    expect(screen.getByText('Last time (Tue 20 Oct): 10 · 10 @ 60 kg')).toBeInTheDocument()
     expect(nav).toThrow() // tab bar hidden while logging
     const weight1 = screen.getByLabelText('Set 1 weight (kg)')
     expect(weight1).toHaveValue('60')
@@ -157,13 +203,14 @@ describe('tracking a training day', () => {
 
   it('edits a saved workout in place', async () => {
     const { user, repo } = await renderApp()
-    await user.click(screen.getByText('Barbell row'))
+    await expandCard(user, /^Pull/)
+    await user.click(screen.getByRole('button', { name: 'Details ›' }))
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     const reps = screen.getByLabelText('Set 1 reps')
     await user.clear(reps)
     await user.type(reps, '12')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
-    expect(screen.getByText('50 kg × 12')).toBeInTheDocument()
+    expect(screen.getByText('12 @ 50 kg')).toBeInTheDocument()
     const workouts = (await repo.load()).workouts
     expect(workouts).toHaveLength(2)
     expect(workouts.find((w) => w.id === 'w-pull')!.entries[0].sets).toEqual([{ weight: 50, reps: 12 }])
@@ -369,7 +416,9 @@ describe('training day descriptions', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Pull/ }))
     await user.type(screen.getByLabelText('Description'), 'Gym was packed')
     await user.click(screen.getByRole('button', { name: 'Finish' }))
-    await user.click(screen.getByText('Gym was packed'))
+    // The card of the day just saved is open, showing the description.
+    expect(screen.getByText('Gym was packed')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Details ›' }))
     expect(screen.getByRole('heading', { name: /Pull · Tue 27 Oct/ })).toBeInTheDocument()
     expect(screen.getByText('Gym was packed')).toBeInTheDocument()
 
@@ -440,5 +489,34 @@ describe('swiping between tabs', () => {
     fireEvent.pointerUp(bar, { clientX: 260, pointerId: 1 })
     expect(current()).toBe('Plans')
     expect(bar).not.toHaveClass('dragging')
+  })
+})
+
+describe('notifications', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('fade away on their own, or when tapped', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { user } = await renderApp()
+    const saveRestDay = async (name: string) => {
+      await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
+      await user.click(screen.getByRole('button', { name: '+ New' }))
+      await user.type(screen.getByPlaceholderText('e.g. Push, or Rest day'), name)
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+    }
+
+    await saveRestDay('Rest')
+    expect(screen.getByRole('status')).toHaveTextContent('Saved Rest.')
+    act(() => vi.advanceTimersByTime(TOAST_MS - 500))
+    // A new one replaces it and gets the full time again.
+    await saveRestDay('Walk')
+    act(() => vi.advanceTimersByTime(TOAST_MS - 500))
+    expect(screen.getByRole('status')).toHaveTextContent('Saved Walk.')
+    act(() => vi.advanceTimersByTime(500))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+
+    await saveRestDay('Stretch')
+    await user.click(screen.getByRole('status'))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })
