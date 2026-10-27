@@ -8,6 +8,8 @@ import {
   localDate,
   removeEntry,
   replaceEntry,
+  setBodyWeight,
+  setDescription,
   startWorkout,
   updateSets,
   type Diary,
@@ -108,6 +110,16 @@ describe('changing the workout', () => {
 })
 
 describe('finishWorkout', () => {
+  it('trims the description and drops it when empty', () => {
+    expect(finishWorkout(setDescription(start(), '  Felt strong \n')).description).toBe('Felt strong')
+    expect(finishWorkout(setDescription(start(), '   '))).not.toHaveProperty('description')
+  })
+
+  it('keeps a rest day without exercises', () => {
+    const rest = startWorkout({ id: 'rest', name: 'Rest day', exerciseIds: [] }, diary, NOW)
+    expect(finishWorkout(setBodyWeight(rest, 81)).entries).toEqual([])
+  })
+
   it('drops sets without reps and exercises without sets', () => {
     let active = start()
     active = updateSets(active, 0, [{ weight: 62.5, reps: 8 }, { weight: 62.5, reps: 0 }])

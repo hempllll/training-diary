@@ -1,6 +1,6 @@
 # training-diary
 
-Gym training diary PWA for personal use. The user creates exercises (with an optional description, e.g. machine settings) and plans (an ordered list of exercises, e.g. Push / Pull / Legs), then tracks training days: pick a plan on the home screen and enter weight and reps per set for each exercise in order, plus their body weight that day (optional). While tracking, an exercise can be replaced or added for that day only (machine taken, broken, …). The home screen lists tracked training days newest first, filterable by plan; the Exercises tab shows progress per exercise.
+Gym training diary PWA for personal use. The user creates exercises (with an optional description, e.g. machine settings) and plans (an ordered list of exercises, e.g. Push / Pull / Legs; a plan without exercises is a rest day), then tracks training days: pick a plan on the home screen and enter weight and reps per set for each exercise in order, plus their body weight and a description of the day (both optional). While tracking, an exercise can be replaced or added for that day only (machine taken, broken, …). The home screen lists tracked training days newest first, filterable by plan; the Exercises tab shows progress per exercise.
 
 **Naming:** the UI says "plan" for what the code calls `TrainingDay`, and "training day" for a tracked `Workout`. The code keeps its original names.
 
@@ -22,6 +22,7 @@ Gym training diary PWA for personal use. The user creates exercises (with an opt
 - Changes made during a workout never modify the training day.
 - The workout in progress is persisted separately (`training-diary.active`), so closing the app mid-workout loses nothing.
 - Units: kg; dates are local `YYYY-MM-DD` strings. Number inputs accept a decimal comma.
+- Motion is CSS only (page entry animation keyed per navigation in `App.tsx`, tab bar in `NavBar.tsx`/`App.css`) and switched off under `prefers-reduced-motion`.
 
 ## About the user
 - Strong in Python, knows basics of other mainstream languages, new to TypeScript, web tooling and mobile development. Briefly explain web/TypeScript-specific concepts when they first come up.

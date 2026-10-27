@@ -28,7 +28,8 @@ export function WorkoutView({ workout, diary, canEdit, onBack, onEdit, onDelete 
       </div>
 
       {workout.bodyWeight && <p className="notice">Body weight: {formatKg(workout.bodyWeight)} kg</p>}
-      {workout.entries.length === 0 && <p className="notice">No exercises logged.</p>}
+      {workout.description && <p className="description">{workout.description}</p>}
+      {workout.entries.length === 0 && <p className="notice">No exercises.</p>}
       <ol className="list">
         {workout.entries.map((e, i) => (
           <li key={i} className="card static">

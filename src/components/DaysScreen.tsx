@@ -1,5 +1,5 @@
 import { sortWorkouts, type Diary } from '../diary'
-import { formatDate, plural } from '../ui/format'
+import { formatDate, planSummary } from '../ui/format'
 
 interface DaysScreenProps {
   diary: Diary
@@ -22,7 +22,9 @@ export function DaysScreen({ diary, onAdd, onEdit }: DaysScreenProps) {
       </div>
 
       {diary.days.length === 0 ? (
-        <p className="notice">No plans yet. Create one, e.g. “Push” with your push exercises.</p>
+        <p className="notice">
+          No plans yet. Create one, e.g. “Push” with your push exercises, or a rest day without any.
+        </p>
       ) : (
         <ul className="list">
           {diary.days.map((d) => {
@@ -33,7 +35,7 @@ export function DaysScreen({ diary, onAdd, onEdit }: DaysScreenProps) {
                   <span className="row-main">
                     <span className="row-title">{d.name}</span>
                     <span className="row-sub">
-                      {plural(d.exerciseIds.length, 'exercise')}
+                      {planSummary(d.exerciseIds.length)}
                       {last ? ` · last ${formatDate(last)}` : ''}
                     </span>
                   </span>

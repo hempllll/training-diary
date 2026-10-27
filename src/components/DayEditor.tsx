@@ -28,10 +28,7 @@ export function DayEditor({ day, diary, onSave, onDelete, onCancel, createExerci
   const shownIds = exerciseIds.filter((id) => byId.has(id))
 
   function save() {
-    const problems = [
-      nameError(name, diary.days, day?.id),
-      shownIds.length === 0 ? 'Add at least one exercise.' : null,
-    ].filter((p): p is string => p !== null)
+    const problems = [nameError(name, diary.days, day?.id)].filter((p): p is string => p !== null)
     setErrors(problems)
     if (problems.length > 0) return
     onSave({ id: day?.id ?? newId(), name: name.trim(), exerciseIds: shownIds })
@@ -57,14 +54,16 @@ export function DayEditor({ day, diary, onSave, onDelete, onCancel, createExerci
           className="text-input"
           type="text"
           value={name}
-          placeholder="e.g. Push"
+          placeholder="e.g. Push, or Rest day"
           onChange={(e) => setName(e.target.value)}
         />
       </label>
 
       <div className="field">
         <span className="field-label">Exercises, in order</span>
-        {shownIds.length === 0 && <p className="notice">No exercises yet.</p>}
+        {shownIds.length === 0 && (
+          <p className="notice">No exercises: tracking this plan records a rest day.</p>
+        )}
         <ol className="list">
           {shownIds.map((id, i) => {
             const exerciseName = byId.get(id)!.name

@@ -8,14 +8,15 @@ and installs to the iPhone home screen. See [CLAUDE.md](CLAUDE.md).
 
 - **Training days** (home): tracked training days newest first, filterable by plan.
   Track a training day from a plan and log weight and reps per set for each exercise
-  in order, pre-filled with last time's numbers, plus your body weight that day.
+  in order, pre-filled with last time's numbers, plus your body weight and a
+  description of the day.
   Replace or add an exercise for that day only, leave and resume later, or edit a
   tracked day.
 - **Exercises**: add, edit (name and description, e.g. machine settings) and delete
   exercises; see a progress chart (top weight, estimated 1RM, volume) and the full
   history of each. The description shows while tracking.
-- **Plans**: create plans (e.g. Push, Pull, Legs), rename them, add/remove exercises
-  and change their order.
+- **Plans**: create plans (e.g. Push, Pull, Legs, or a rest day without exercises),
+  rename them, add/remove exercises and change their order.
 - **Backup**: export the whole diary as JSON and restore it from a file.
 
 ## Stack

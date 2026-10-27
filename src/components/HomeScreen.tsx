@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { dayFilters, recentWorkouts, type ActiveWorkout, type Diary } from '../diary'
-import { formatDate, formatKg, plural, summarizeSets } from '../ui/format'
+import { formatDate, formatKg, planSummary, summarizeSets } from '../ui/format'
 import { Dialog } from './Dialog'
 
 interface HomeScreenProps {
@@ -87,8 +87,9 @@ export function HomeScreen({
                   <span className="muted">{formatDate(w.date)}</span>
                 </span>
                 {w.bodyWeight && <span className="row-sub">Body weight {formatKg(w.bodyWeight)} kg</span>}
+                {w.description && <span className="card-description">{w.description}</span>}
                 {w.entries.length === 0 ? (
-                  <span className="row-sub">No exercises logged</span>
+                  <span className="row-sub">No exercises</span>
                 ) : (
                   <span className="entry-lines">
                     {w.entries.map((e, i) => (
@@ -120,7 +121,7 @@ export function HomeScreen({
                 >
                   <span className="row-main">
                     <span className="row-title">{d.name}</span>
-                    <span className="row-sub">{plural(d.exerciseIds.length, 'exercise')}</span>
+                    <span className="row-sub">{planSummary(d.exerciseIds.length)}</span>
                   </span>
                 </button>
               </li>

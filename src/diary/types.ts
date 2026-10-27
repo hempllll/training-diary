@@ -20,11 +20,14 @@ export interface Exercise {
   description?: string
 }
 
-/** A planned workout, e.g. "Push": an ordered list of exercises. */
+/**
+ * A planned workout, e.g. "Push": an ordered list of exercises. A plan with
+ * no exercises is a rest day.
+ */
 export interface TrainingDay {
   id: string
   name: string
-  /** Exercise ids in the order they are trained. */
+  /** Exercise ids in the order they are trained; empty for a rest day. */
   exerciseIds: string[]
 }
 
@@ -58,6 +61,8 @@ export interface Workout {
   startedAt: string
   /** The user's body weight that day (kg), if entered. Missing in data from v1. */
   bodyWeight?: number
+  /** Free-text notes about the day. Missing in data before v3. */
+  description?: string
   entries: WorkoutEntry[]
 }
 

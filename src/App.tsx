@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import './App.css'
 import { BackupDialog } from './components/BackupDialog'
 import { DayEditor } from './components/DayEditor'
@@ -62,13 +62,62 @@ const TAB_VIEW: Record<Tab, View> = {
   days: { name: 'days' },
 }
 
+// --- page transitions ------------------------------------------------------
+
+/** How a page change animates; see `.page[data-motion]` in App.css. */
+type Motion = 'forward' | 'back' | 'next-tab' | 'prev-tab' | 'fade'
+
+/** 0 = a tab's main screen, 1 = a screen opened from it. */
+const DEPTH: Record<View['name'], number> = {
+  home: 0,
+  exercises: 0,
+  days: 0,
+  workout: 1,
+  run: 1,
+  exercise: 1,
+  day: 1,
+}
+const TAB_ORDER: Tab[] = ['home', 'exercises', 'days']
+
+/** Opening a screen slides in from the right, going back from the left, and
+ * switching tabs slides towards the tab's side of the bar. */
+function motionBetween(from: View, to: View): Motion {
+  const deeper = DEPTH[to.name] - DEPTH[from.name]
+  if (deeper !== 0) return deeper > 0 ? 'forward' : 'back'
+  const step = TAB_ORDER.indexOf(TAB_OF[to.name]) - TAB_ORDER.indexOf(TAB_OF[from.name])
+  return step > 0 ? 'next-tab' : step < 0 ? 'prev-tab' : 'fade'
+}
+
+/** Identifies a screen for remembering its scroll position. */
+const scrollKey = (v: View) => ('id' in v && v.id ? `${v.name}:${v.id}` : v.name)
+
 function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   const [repo] = useState<DiaryRepository>(() => repoProp ?? new LocalStorageDiaryRepository())
   const { diary, active, loadError, update, setActive } = useDiary(repo)
-  const [view, setView] = useState<View>({ name: 'home' })
+  // `seq` changes on every navigation and keys the page, so its entry
+  // animation plays again.
+  const [nav, setNav] = useState<{ view: View; motion: Motion; seq: number }>({
+    view: { name: 'home' },
+    motion: 'fade',
+    seq: 0,
+  })
+  const view = nav.view
+  const scrollPositions = useRef(new Map<string, number>())
   const [filter, setFilter] = useState<Set<string>>(new Set())
   const [backupOpen, setBackupOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+
+  // Opened screens start at the top; going back or switching tabs returns to
+  // where that screen was left.
+  useLayoutEffect(() => {
+    const y = nav.motion === 'forward' ? 0 : (scrollPositions.current.get(scrollKey(nav.view)) ?? 0)
+    window.scrollTo(0, y)
+  }, [nav])
+
+  function navigate(next: View) {
+    scrollPositions.current.set(scrollKey(view), window.scrollY)
+    setNav((cur) => ({ view: next, motion: motionBetween(cur.view, next), seq: cur.seq + 1 }))
+  }
 
   if (loadError) return <LoadErrorScreen error={loadError} today={localDate(now())} />
   if (!diary) return <p className="notice loading">Loading…</p>
@@ -86,7 +135,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
     const day = diary?.days.find((d) => d.id === dayId)
     if (!day || !diary) return
     void setActive(startWorkout(day, diary, now()))
-    setView({ name: 'run' })
+    navigate({ name: 'run' })
   }
 
   function handleFinish() {
@@ -95,13 +144,13 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
     void update((d) => saveWorkout(d, workout))
     void setActive(null)
     setMessage(`Saved ${workout.dayName} (${formatDate(workout.date)}).`)
-    setView(active.editing ? { name: 'workout', id: workout.id } : { name: 'home' })
+    navigate(active.editing ? { name: 'workout', id: workout.id } : { name: 'home' })
   }
 
   function handleDiscard() {
     if (!active) return
     void setActive(null)
-    setView(active.editing ? { name: 'workout', id: active.workout.id } : { name: 'home' })
+    navigate(active.editing ? { name: 'workout', id: active.workout.id } : { name: 'home' })
   }
 
   // --- training days -------------------------------------------------------
@@ -109,7 +158,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   function handleSaveDay(day: TrainingDay, back: View) {
     void update((d) => saveDay(d, day))
     setMessage(`Saved ${day.name}.`)
-    setView(back)
+    navigate(back)
   }
 
   // --- screens -------------------------------------------------------------
@@ -122,7 +171,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
           diary={d}
           onChange={(next) => void setActive(next)}
           onFinish={handleFinish}
-          onLeave={() => setView({ name: 'home' })}
+          onLeave={() => navigate({ name: 'home' })}
           onDiscard={handleDiscard}
           createExercise={createExercise}
         />
@@ -136,15 +185,15 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
             workout={workout}
             diary={d}
             canEdit={!active}
-            onBack={() => setView({ name: 'home' })}
+            onBack={() => navigate({ name: 'home' })}
             onEdit={() => {
               void setActive(editWorkout(workout))
-              setView({ name: 'run' })
+              navigate({ name: 'run' })
             }}
             onDelete={() => {
               void update((x) => deleteWorkout(x, workout.id))
               setMessage('Training day deleted.')
-              setView({ name: 'home' })
+              navigate({ name: 'home' })
             }}
           />
         )
@@ -158,12 +207,12 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
             key={exercise.id}
             exercise={exercise}
             diary={d}
-            onBack={() => setView({ name: 'exercises' })}
+            onBack={() => navigate({ name: 'exercises' })}
             onSave={(changes) => void update((x) => saveExercise(x, { ...exercise, ...changes }))}
             onDelete={() => {
               void update((x) => deleteExercise(x, exercise.id))
               setMessage(`Deleted ${exercise.name}.`)
-              setView({ name: 'exercises' })
+              navigate({ name: 'exercises' })
             }}
           />
         )
@@ -174,7 +223,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
         <ExercisesScreen
           diary={d}
           onAdd={(name) => void update((x) => saveExercise(x, { id: newId(), name }))}
-          onOpen={(id) => setView({ name: 'exercise', id })}
+          onOpen={(id) => navigate({ name: 'exercise', id })}
         />
       )
     }
@@ -191,11 +240,11 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
               ? () => {
                   void update((x) => deleteDay(x, day.id))
                   setMessage(`Deleted ${day.name}.`)
-                  setView({ name: 'days' })
+                  navigate({ name: 'days' })
                 }
               : undefined
           }
-          onCancel={() => setView(view.back)}
+          onCancel={() => navigate(view.back)}
           createExercise={createExercise}
         />
       )
@@ -204,8 +253,8 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
       return (
         <DaysScreen
           diary={d}
-          onAdd={() => setView({ name: 'day', id: null, back: view })}
-          onEdit={(id) => setView({ name: 'day', id, back: view })}
+          onAdd={() => navigate({ name: 'day', id: null, back: view })}
+          onEdit={(id) => navigate({ name: 'day', id, back: view })}
         />
       )
     }
@@ -216,9 +265,9 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
         filter={filter}
         onFilterChange={setFilter}
         onStart={handleStart}
-        onResume={() => setView({ name: 'run' })}
-        onOpenWorkout={(id) => setView({ name: 'workout', id })}
-        onCreateDay={() => setView({ name: 'day', id: null, back: { name: 'home' } })}
+        onResume={() => navigate({ name: 'run' })}
+        onOpenWorkout={(id) => navigate({ name: 'workout', id })}
+        onCreateDay={() => navigate({ name: 'day', id: null, back: { name: 'home' } })}
       />
     )
   }
@@ -246,14 +295,18 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
         </p>
       )}
 
-      <main>{renderScreen(diary)}</main>
+      <main>
+        <div key={nav.seq} className="page" data-motion={nav.motion}>
+          {renderScreen(diary)}
+        </div>
+      </main>
 
       {!focused && (
         <NavBar
           tab={TAB_OF[view.name]}
           onSelect={(tab) => {
             setMessage(null)
-            setView(TAB_VIEW[tab])
+            navigate(TAB_VIEW[tab])
           }}
         />
       )}
