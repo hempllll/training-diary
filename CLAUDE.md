@@ -23,6 +23,7 @@ Gym training diary PWA for personal use. The user creates exercises (with an opt
 - The workout in progress is persisted separately (`training-diary.active`), so closing the app mid-workout loses nothing.
 - Units: kg; dates are local `YYYY-MM-DD` strings. Number inputs accept a decimal comma.
 - Motion is CSS only (page entry animation keyed per navigation in `App.tsx`, tab bar in `NavBar.tsx`/`App.css`) and switched off under `prefers-reduced-motion`.
+- Gestures: swiping across a tab's main screen switches tabs (`hooks/useSwipe.ts`), and dragging along the tab bar moves its highlight (`NavBar.tsx`). Both skip fields, dialogs and sideways scrollers.
 
 ## About the user
 - Strong in Python, knows basics of other mainstream languages, new to TypeScript, web tooling and mobile development. Briefly explain web/TypeScript-specific concepts when they first come up.

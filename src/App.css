@@ -66,6 +66,19 @@ button.icon {
 }
 
 /* --- header -------------------------------------------------------------- */
+/* A solid strip behind the status bar (the app draws under it), so content
+   scrolls away beneath it instead of running into the clock. iOS 26 blurs
+   the top edge of a home screen app; with a solid header there, it extends
+   that instead of blurring the page's first line. */
+.status-cap {
+  position: fixed;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: var(--bg);
+}
 .app-header {
   padding: 0.75rem 1rem 0.5rem;
   display: flex;
@@ -80,6 +93,10 @@ button.icon {
 main {
   flex: 1;
   padding: 0 1rem 1rem;
+}
+/* Full-screen flows have no app header: keep the same gap above them. */
+.app:not(.has-tab-bar) main {
+  padding-top: 0.75rem;
 }
 
 .screen {
@@ -343,9 +360,15 @@ main {
   border: 1px solid var(--glass-edge);
   box-shadow:
     inset 0 1px 0 var(--glass-shine),
-    0 8px 28px rgb(0 0 0 / 0.18);
+    0 8px 28px rgb(0 0 0 / 0.14);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
+  /* Sideways drags move the highlight (NavBar), so the browser mustn't
+     claim them for scrolling or text selection. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 /* Grows a little while touched, like the iOS tab bars. */
 .tab-bar.pressed {
@@ -369,6 +392,10 @@ main {
   transform: translateX(calc(var(--tab) * (100% + 0.2rem)));
   transition: transform 0.5s var(--spring);
 }
+/* Follows the finger directly while dragged. */
+.tab-bar.dragging .tab-indicator {
+  transition: none;
+}
 /* Re-created on every tab change, so it stretches sideways while moving. */
 .tab-blob {
   display: block;
@@ -376,6 +403,14 @@ main {
   border-radius: 999px;
   background: var(--glass-selected);
   animation: blob 0.5s ease-out;
+  transition:
+    scale 0.35s var(--spring),
+    background-color 0.2s;
+}
+/* While touched, the pill swells into a lighter lens. */
+.tab-bar.pressed .tab-blob {
+  scale: 1.1 1.14;
+  background: var(--glass-lens);
 }
 @keyframes blob {
   35% {
@@ -400,19 +435,21 @@ main {
   gap: 0.05rem;
   padding: 0.35rem 0.25rem;
   font-size: 0.75rem;
+  font-weight: 500;
   background: none;
   border: none;
   border-radius: 999px;
-  color: var(--muted);
+  /* One ink for every tab; the grey pill alone marks the current page. */
+  color: var(--text);
   position: relative; /* above the highlight */
-  transition: color 0.25s;
 }
 .tab-bar button[aria-current='page'] {
-  color: var(--accent);
   font-weight: 600;
 }
 .tab-icon {
-  font-size: 1.2rem;
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
   transition: scale 0.3s var(--spring);
 }
 .tab-bar button:active .tab-icon {
