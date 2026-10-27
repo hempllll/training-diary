@@ -1,0 +1,21 @@
+name: CI
+
+# Runs on every pull request to main: lint, test and build — but never deploys.
+# The deploy workflow stays separate and only runs on pushes to main.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

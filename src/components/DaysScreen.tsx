@@ -1,0 +1,51 @@
+import { sortWorkouts, type Diary } from '../diary'
+import { formatDate, plural } from '../ui/format'
+
+interface DaysScreenProps {
+  diary: Diary
+  onAdd: () => void
+  onEdit: (id: string) => void
+}
+
+/** The user's training days (workout plans); tap one to edit it. */
+export function DaysScreen({ diary, onAdd, onEdit }: DaysScreenProps) {
+  const lastDone = new Map<string, string>()
+  for (const w of sortWorkouts(diary.workouts)) if (!lastDone.has(w.dayId)) lastDone.set(w.dayId, w.date)
+
+  return (
+    <section className="screen">
+      <div className="view-header">
+        <h2>Training days</h2>
+        <button type="button" className="primary" onClick={onAdd}>
+          + New
+        </button>
+      </div>
+
+      {diary.days.length === 0 ? (
+        <p className="notice">No training days yet. Create one, e.g. “Push” with your push exercises.</p>
+      ) : (
+        <ul className="list">
+          {diary.days.map((d) => {
+            const last = lastDone.get(d.id)
+            return (
+              <li key={d.id}>
+                <button type="button" className="row" onClick={() => onEdit(d.id)}>
+                  <span className="row-main">
+                    <span className="row-title">{d.name}</span>
+                    <span className="row-sub">
+                      {plural(d.exerciseIds.length, 'exercise')}
+                      {last ? ` · last ${formatDate(last)}` : ''}
+                    </span>
+                  </span>
+                  <span className="chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}
