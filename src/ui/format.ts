@@ -54,6 +54,11 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`
 }
 
+/** What a plan contains: "3 exercises", or "Rest day" when it has none. */
+export function planSummary(exerciseCount: number): string {
+  return exerciseCount === 0 ? 'Rest day' : plural(exerciseCount, 'exercise')
+}
+
 /** A readable message for anything thrown. */
 export function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)

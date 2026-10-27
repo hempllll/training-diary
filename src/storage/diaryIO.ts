@@ -13,13 +13,14 @@
  *   1  first release. The stored copy was the bare diary, without wrapper.
  *   2  optional `Exercise.description` and `Workout.bodyWeight`; the stored
  *      copy is wrapped like an export.
+ *   3  optional `Workout.description`; plans may have no exercises (rest days).
  * A change that isn't purely additive must convert older versions in
  * `readDiary` before validation.
  */
 import type { Diary, SetEntry, TrainingDay, Workout, WorkoutEntry } from '../diary'
 
 const FORMAT = 'training-diary/diary'
-export const FORMAT_VERSION = 2
+export const FORMAT_VERSION = 3
 
 interface DiaryFile extends Diary {
   format: typeof FORMAT
@@ -106,6 +107,9 @@ function validateWorkout(value: unknown, where: string): Workout {
     (typeof w.bodyWeight !== 'number' || !Number.isFinite(w.bodyWeight) || w.bodyWeight <= 0)
   ) {
     fail(`${where}.bodyWeight must be a number > 0`)
+  }
+  if (w.description !== undefined && typeof w.description !== 'string') {
+    fail(`${where}.description must be text`)
   }
   array(w.entries, `${where}.entries`).forEach((e, i) => validateEntry(e, `${where}.entries[${i}]`))
   return value as unknown as Workout

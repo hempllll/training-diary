@@ -7,6 +7,7 @@ import {
   removeEntry,
   replaceEntry,
   setBodyWeight,
+  setDescription,
   updateSets,
   type ActiveWorkout,
   type Diary,
@@ -200,12 +201,23 @@ export function WorkoutRunner({
         </div>
       ) : (
         <div className="empty">
-          <p className="notice">No exercises yet.</p>
+          <p className="notice">Rest day: no exercises. Add your body weight or a description, then finish.</p>
           <button type="button" onClick={() => setPicking('add')}>
             + Add exercise
           </button>
         </div>
       )}
+
+      <label className="field">
+        <span className="field-label">Description</span>
+        <textarea
+          className="text-input"
+          rows={2}
+          value={workout.description ?? ''}
+          placeholder="e.g. Felt strong, short on time, went for a walk"
+          onChange={(e) => onChange(setDescription(active, e.target.value))}
+        />
+      </label>
 
       <div className="actions end">
         <ConfirmButton

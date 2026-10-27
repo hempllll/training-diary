@@ -4,7 +4,9 @@
  * own localStorage repository and export), so they are exactly what users have
  * stored. Never edit them; when the format changes, bump FORMAT_VERSION and
  * add a new set (`v<N>-stored-diary.json`, `v<N>-stored-active.json`,
- * `v<N>-export.json`) — the first test fails until you do.
+ * `v<N>-export.json`) — the first test fails until you do. (Locally, Vitest
+ * caches the expanded fixture list: if new files aren't found, delete
+ * node_modules/.vitest-cache. CI always starts fresh.)
  */
 import { describe, expect, it } from 'vitest'
 import { dayFilters, finishWorkout, saveExercise, type Diary } from '../../diary'

@@ -93,6 +93,11 @@ export function setBodyWeight(active: ActiveWorkout, kg: number | undefined): Ac
   return { ...active, workout: kg ? { ...workout, bodyWeight: kg } : workout }
 }
 
+/** Set the day's description, as typed (trimmed when the day is finished). */
+export function setDescription(active: ActiveWorkout, text: string): ActiveWorkout {
+  return { ...active, workout: { ...active.workout, description: text } }
+}
+
 /** The most recently entered body weight, e.g. as a hint for today's. */
 export function lastBodyWeight(workouts: Workout[], excludeId?: string): number | undefined {
   return sortWorkouts(workouts).find((w) => w.id !== excludeId && w.bodyWeight)?.bodyWeight
@@ -151,11 +156,14 @@ export function removeEntry(active: ActiveWorkout, index: number): ActiveWorkout
 
 /**
  * The workout to save: sets with no reps are dropped, and exercises left
- * without any set count as skipped and are dropped too.
+ * without any set count as skipped and are dropped too. The description is
+ * trimmed, and dropped when empty.
  */
 export function finishWorkout(active: ActiveWorkout): Workout {
-  const entries = active.workout.entries
+  const { description, ...workout } = active.workout
+  const entries = workout.entries
     .map((e) => ({ ...e, sets: e.sets.filter((s) => s.reps > 0) }))
     .filter((e) => e.sets.length > 0)
-  return { ...active.workout, entries }
+  const text = description?.trim()
+  return text ? { ...workout, description: text, entries } : { ...workout, entries }
 }

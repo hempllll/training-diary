@@ -219,9 +219,8 @@ describe('plans tab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByText('Enter a name.')).toBeInTheDocument()
-    expect(screen.getByText('Add at least one exercise.')).toBeInTheDocument()
 
-    await user.type(screen.getByPlaceholderText('e.g. Push'), 'Legs')
+    await user.type(screen.getByPlaceholderText('e.g. Push, or Rest day'), 'Legs')
     for (const name of ['Squat', 'Leg curl']) {
       await user.click(screen.getByRole('button', { name: '+ Add exercise' }))
       await user.type(screen.getByLabelText('Search or type a new exercise'), name)
@@ -336,5 +335,65 @@ describe('data stored by an earlier version', () => {
     expect(await screen.findByRole('heading', { name: 'Your diary couldn’t be loaded' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Download stored data' })).toBeInTheDocument()
     expect(storage.getItem(DIARY_KEY)).toBe('{"exercises": [')
+  })
+})
+
+describe('rest days', () => {
+  it('are plans without exercises, tracked with body weight and a description', async () => {
+    const { user, repo } = await renderApp()
+    await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
+    await user.click(screen.getByRole('button', { name: '+ New' }))
+    await user.type(screen.getByPlaceholderText('e.g. Push, or Rest day'), 'Rest day')
+    expect(screen.getByText('No exercises: tracking this plan records a rest day.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByText('Saved Rest day.')).toBeInTheDocument()
+
+    await user.click(within(nav()).getByRole('button', { name: /Training days/ }))
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Rest day/ }))
+    expect(screen.getByText(/^Rest day: no exercises/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Body weight (kg)'), '82')
+    await user.type(screen.getByLabelText('Description'), '  Long walk ')
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+
+    const saved = (await repo.load()).workouts.find((w) => w.date === '2026-10-27')!
+    expect(saved).toMatchObject({ dayName: 'Rest day', entries: [], bodyWeight: 82, description: 'Long walk' })
+    expect(screen.getByText('Long walk')).toBeInTheDocument() // on the home card
+  })
+})
+
+describe('training day descriptions', () => {
+  it('are entered while tracking and shown in the detail view', async () => {
+    const { user, repo } = await renderApp()
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Pull/ }))
+    await user.type(screen.getByLabelText('Description'), 'Gym was packed')
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+    await user.click(screen.getByText('Gym was packed'))
+    expect(screen.getByRole('heading', { name: /Pull · Tue 27 Oct/ })).toBeInTheDocument()
+    expect(screen.getByText('Gym was packed')).toBeInTheDocument()
+
+    // Clearing it while editing removes it.
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.clear(screen.getByLabelText('Description'))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    const saved = (await repo.load()).workouts.find((w) => w.date === '2026-10-27')!
+    expect(saved).not.toHaveProperty('description')
+  })
+})
+
+describe('page transitions', () => {
+  it('slide according to where the navigation goes', async () => {
+    const { user } = await renderApp()
+    const motion = () => document.querySelector('.page')?.getAttribute('data-motion')
+    expect(motion()).toBe('fade')
+    await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
+    expect(motion()).toBe('next-tab')
+    await user.click(within(nav()).getByRole('button', { name: /Exercises/ }))
+    expect(motion()).toBe('prev-tab')
+    await user.click(screen.getByText('Bench press'))
+    expect(motion()).toBe('forward')
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(motion()).toBe('back')
   })
 })
