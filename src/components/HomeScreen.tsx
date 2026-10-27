@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import { dayFilters, recentWorkouts, type ActiveWorkout, type Diary } from '../diary'
-import { formatDate, formatKg, planSummary, summarizeSets } from '../ui/format'
-import { Dialog } from './Dialog'
+import { formatDate, formatKg, setGroups } from '../ui/format'
 
 interface HomeScreenProps {
   diary: Diary
@@ -9,36 +7,40 @@ interface HomeScreenProps {
   /** Plan ids to show; empty = all. */
   filter: ReadonlySet<string>
   onFilterChange: (filter: Set<string>) => void
-  onStart: (dayId: string) => void
+  /** Training days opened up to show their exercises. */
+  expanded: ReadonlySet<string>
+  onExpandedChange: (expanded: Set<string>) => void
   onResume: () => void
   onOpenWorkout: (id: string) => void
   onCreateDay: () => void
 }
 
 /**
- * Tracked training days, newest first, with a filter by plan and the button to
- * track a new one.
+ * Tracked training days, newest first, with a filter by plan (a new one is
+ * tracked with the header's + button). Each card shows the plan, date and body weight; tapping it
+ * opens it up to show the exercises and description (several can be open).
  */
 export function HomeScreen({
   diary,
   active,
   filter,
   onFilterChange,
-  onStart,
+  expanded,
+  onExpandedChange,
   onResume,
   onOpenWorkout,
   onCreateDay,
 }: HomeScreenProps) {
-  const [choosing, setChoosing] = useState(false)
   const filters = dayFilters(diary)
   const workouts = recentWorkouts(diary.workouts, filter)
   const exerciseName = new Map(diary.exercises.map((e) => [e.id, e.name]))
 
-  function toggle(id: string) {
-    const next = new Set(filter)
+  /** A copy of `set` with `id` added or removed. */
+  function toggled(set: ReadonlySet<string>, id: string) {
+    const next = new Set(set)
     if (next.has(id)) next.delete(id)
     else next.add(id)
-    onFilterChange(next)
+    return next
   }
 
   return (
@@ -47,17 +49,15 @@ export function HomeScreen({
         <button type="button" className="primary start" onClick={onResume}>
           {active.editing ? 'Resume editing' : 'Resume'}: {active.workout.dayName}
         </button>
-      ) : diary.days.length > 0 ? (
-        <button type="button" className="primary start" onClick={() => setChoosing(true)}>
-          Track a training day
-        </button>
       ) : (
-        <div className="empty">
-          <p className="notice">Create a plan (e.g. Push, Pull, Legs) to track your first training day.</p>
-          <button type="button" className="primary" onClick={onCreateDay}>
-            + New plan
-          </button>
-        </div>
+        diary.days.length === 0 && (
+          <div className="empty">
+            <p className="notice">Create a plan (e.g. Push, Pull, Legs) to track your first training day.</p>
+            <button type="button" className="primary" onClick={onCreateDay}>
+              + New plan
+            </button>
+          </div>
+        )
       )}
 
       {filters.length > 1 && (
@@ -66,7 +66,7 @@ export function HomeScreen({
             All
           </button>
           {filters.map((f) => (
-            <button key={f.id} type="button" aria-pressed={filter.has(f.id)} onClick={() => toggle(f.id)}>
+            <button key={f.id} type="button" aria-pressed={filter.has(f.id)} onClick={() => onFilterChange(toggled(filter, f.id))}>
               {f.name}
             </button>
           ))}
@@ -79,55 +79,57 @@ export function HomeScreen({
         </p>
       ) : (
         <ul className="list">
-          {workouts.map((w) => (
-            <li key={w.id}>
-              <button type="button" className="card" onClick={() => onOpenWorkout(w.id)}>
-                <span className="card-head">
-                  <span className="row-title">{w.dayName}</span>
-                  <span className="muted">{formatDate(w.date)}</span>
-                </span>
-                {w.bodyWeight && <span className="row-sub">Body weight {formatKg(w.bodyWeight)} kg</span>}
-                {w.description && <span className="card-description">{w.description}</span>}
-                {w.entries.length === 0 ? (
-                  <span className="row-sub">No exercises</span>
-                ) : (
-                  <span className="entry-lines">
-                    {w.entries.map((e, i) => (
-                      <span key={i} className="entry-line">
-                        <span>{exerciseName.get(e.exerciseId) ?? e.exerciseName}</span>
-                        <span className="muted">{summarizeSets(e.sets)}</span>
-                      </span>
-                    ))}
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {choosing && (
-        <Dialog title="Which plan?" onClose={() => setChoosing(false)}>
-          <ul className="list picker-list">
-            {diary.days.map((d) => (
-              <li key={d.id}>
+          {workouts.map((w) => {
+            const open = expanded.has(w.id)
+            const bodyId = `workout-${w.id}`
+            return (
+              <li key={w.id} className="card">
                 <button
                   type="button"
-                  className="row"
-                  onClick={() => {
-                    setChoosing(false)
-                    onStart(d.id)
-                  }}
+                  className="card-toggle"
+                  aria-expanded={open}
+                  aria-controls={bodyId}
+                  onClick={() => onExpandedChange(toggled(expanded, w.id))}
                 >
-                  <span className="row-main">
-                    <span className="row-title">{d.name}</span>
-                    <span className="row-sub">{planSummary(d.exerciseIds.length)}</span>
+                  <span className="card-head">
+                    <span className="row-title">{w.dayName}</span>
+                    <span className="muted">{formatDate(w.date)}</span>
+                    <span className="chevron" aria-hidden="true">
+                      ›
+                    </span>
                   </span>
+                  {w.bodyWeight && <span className="row-sub">Body weight {formatKg(w.bodyWeight)} kg</span>}
                 </button>
+                {open && (
+                  <div id={bodyId} className="card-body">
+                    {w.description && <p className="card-description">{w.description}</p>}
+                    {w.entries.length === 0 ? (
+                      <p className="row-sub">No exercises</p>
+                    ) : (
+                      <ul className="entry-lines">
+                        {w.entries.map((e, i) => (
+                          <li key={i} className="entry-line">
+                            <span>{exerciseName.get(e.exerciseId) ?? e.exerciseName}</span>
+                            <span className="muted">
+                              {setGroups(e.sets).map((g, j) => (
+                                <span key={j} className="set-group">
+                                  {g}
+                                </span>
+                              ))}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button type="button" className="card-open" onClick={() => onOpenWorkout(w.id)}>
+                      Details ›
+                    </button>
+                  </div>
+                )}
               </li>
-            ))}
-          </ul>
-        </Dialog>
+            )
+          })}
+        </ul>
       )}
     </section>
   )

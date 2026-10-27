@@ -17,7 +17,7 @@ and installs to the iPhone home screen. See [CLAUDE.md](CLAUDE.md).
   history of each. The description shows while tracking.
 - **Plans**: create plans (e.g. Push, Pull, Legs, or a rest day without exercises),
   rename them, add/remove exercises and change their order.
-- **Backup**: export the whole diary as JSON and restore it from a file.
+- **Backup** (settings gear, top left): export the whole diary as JSON and restore it from a file.
 
 ## Stack
 
