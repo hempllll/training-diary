@@ -392,7 +392,47 @@ main {
   border-style: dashed;
 }
 
-/* --- training day editor ------------------------------------------------- */
+/* body weight, entered once per tracked training day */
+.body-weight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.body-weight .number-input {
+  width: 6rem;
+}
+
+/* --- exercise description ------------------------------------------------ */
+/* pre-wrap keeps the line breaks the user typed (one setting per line). */
+.description {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 0.25rem;
+}
+textarea.text-input {
+  resize: vertical;
+}
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.load-error {
+  padding: 2rem 1rem;
+}
+.load-error h1 {
+  font-size: 1.25rem;
+}
+.load-error p {
+  margin: 0;
+}
+
+/* --- plan editor --------------------------------------------------------- */
 .field {
   display: flex;
   flex-direction: column;

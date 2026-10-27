@@ -3,12 +3,21 @@
  * localStorage and exported/imported as a backup file unchanged.
  *
  * Units: weights in kg, dates as local `YYYY-MM-DD` strings.
+ *
+ * In the UI a `TrainingDay` is called a "plan" and a `Workout` a "training
+ * day" (what the user tracks); the code keeps its original names.
+ *
+ * Users have real data stored: new fields must be optional (or filled in by a
+ * migration in storage/diaryIO.ts), and every format version needs a fixture
+ * in storage/__tests__/fixtures (see compatibility.test.ts).
  */
 
 /** Something you train, e.g. "Bench press". Created by the user. */
 export interface Exercise {
   id: string
   name: string
+  /** Free-text notes, e.g. machine settings. Missing in data from v1. */
+  description?: string
 }
 
 /** A planned workout, e.g. "Push": an ordered list of exercises. */
@@ -47,6 +56,8 @@ export interface Workout {
   date: string
   /** ISO timestamp the workout was started; orders workouts on the same date. */
   startedAt: string
+  /** The user's body weight that day (kg), if entered. Missing in data from v1. */
+  bodyWeight?: number
   entries: WorkoutEntry[]
 }
 

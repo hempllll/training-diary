@@ -1,7 +1,11 @@
-/** Diary persistence: a storage-agnostic repository plus JSON export/import. */
+/** Diary persistence: a storage-agnostic repository plus the JSON format. */
 export {
   type DiaryRepository,
+  DiaryLoadError,
   InMemoryDiaryRepository,
   LocalStorageDiaryRepository,
+  DIARY_KEY,
+  ACTIVE_KEY,
+  backupKey,
 } from './diaryRepository'
-export { exportDiary, parseDiary } from './diaryIO'
+export { FORMAT_VERSION, exportDiary, parseDiary, readDiary, serializeDiary } from './diaryIO'

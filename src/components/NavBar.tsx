@@ -1,9 +1,9 @@
 export type Tab = 'home' | 'exercises' | 'days'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home', label: 'Workouts', icon: '🏋️' },
+  { id: 'home', label: 'Training days', icon: '🏋️' },
   { id: 'exercises', label: 'Exercises', icon: '📈' },
-  { id: 'days', label: 'Training days', icon: '🗓️' },
+  { id: 'days', label: 'Plans', icon: '🗓️' },
 ]
 
 interface NavBarProps {

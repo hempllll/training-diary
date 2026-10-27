@@ -87,6 +87,17 @@ function withEntries(active: ActiveWorkout, entries: WorkoutEntry[], current: nu
   }
 }
 
+/** Set (or clear, with undefined or 0) the body weight for this workout. */
+export function setBodyWeight(active: ActiveWorkout, kg: number | undefined): ActiveWorkout {
+  const { bodyWeight: _old, ...workout } = active.workout
+  return { ...active, workout: kg ? { ...workout, bodyWeight: kg } : workout }
+}
+
+/** The most recently entered body weight, e.g. as a hint for today's. */
+export function lastBodyWeight(workouts: Workout[], excludeId?: string): number | undefined {
+  return sortWorkouts(workouts).find((w) => w.id !== excludeId && w.bodyWeight)?.bodyWeight
+}
+
 /** Jump to the exercise at `index`. */
 export function goTo(active: ActiveWorkout, index: number): ActiveWorkout {
   return withEntries(active, active.workout.entries, index)

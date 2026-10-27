@@ -7,7 +7,7 @@ interface DaysScreenProps {
   onEdit: (id: string) => void
 }
 
-/** The user's training days (workout plans); tap one to edit it. */
+/** The user's plans (`TrainingDay`s in code); tap one to edit it. */
 export function DaysScreen({ diary, onAdd, onEdit }: DaysScreenProps) {
   const lastDone = new Map<string, string>()
   for (const w of sortWorkouts(diary.workouts)) if (!lastDone.has(w.dayId)) lastDone.set(w.dayId, w.date)
@@ -15,14 +15,14 @@ export function DaysScreen({ diary, onAdd, onEdit }: DaysScreenProps) {
   return (
     <section className="screen">
       <div className="view-header">
-        <h2>Training days</h2>
+        <h2>Plans</h2>
         <button type="button" className="primary" onClick={onAdd}>
           + New
         </button>
       </div>
 
       {diary.days.length === 0 ? (
-        <p className="notice">No training days yet. Create one, e.g. “Push” with your push exercises.</p>
+        <p className="notice">No plans yet. Create one, e.g. “Push” with your push exercises.</p>
       ) : (
         <ul className="list">
           {diary.days.map((d) => {

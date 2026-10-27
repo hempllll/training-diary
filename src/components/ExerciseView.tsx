@@ -8,15 +8,16 @@ interface ExerciseViewProps {
   exercise: Exercise
   diary: Diary
   onBack: () => void
-  onRename: (name: string) => void
+  onSave: (changes: { name: string; description: string }) => void
   onDelete: () => void
 }
 
-/** One exercise: its progress chart, full history, rename and delete. */
-export function ExerciseView({ exercise, diary, onBack, onRename, onDelete }: ExerciseViewProps) {
+/** One exercise: its description, progress chart, full history, edit and delete. */
+export function ExerciseView({ exercise, diary, onBack, onSave, onDelete }: ExerciseViewProps) {
   const [metric, setMetric] = useState<Metric>('top')
-  const [renaming, setRenaming] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [name, setName] = useState(exercise.name)
+  const [description, setDescription] = useState(exercise.description ?? '')
   const [error, setError] = useState<string | null>(null)
 
   const points = progressFor(diary.workouts, exercise.id)
@@ -27,12 +28,19 @@ export function ExerciseView({ exercise, diary, onBack, onRename, onDelete }: Ex
   )
   const usedIn = diary.days.filter((d) => d.exerciseIds.includes(exercise.id))
 
-  function saveName() {
+  function save() {
     const problem = nameError(name, diary.exercises, exercise.id)
     setError(problem)
     if (problem) return
-    onRename(name.trim())
-    setRenaming(false)
+    onSave({ name: name.trim(), description: description.trim() })
+    setEditing(false)
+  }
+
+  function cancel() {
+    setEditing(false)
+    setName(exercise.name)
+    setDescription(exercise.description ?? '')
+    setError(null)
   }
 
   return (
@@ -42,56 +50,65 @@ export function ExerciseView({ exercise, diary, onBack, onRename, onDelete }: Ex
           ‹
         </button>
         <h2>{exercise.name}</h2>
-        {!renaming && (
-          <button type="button" onClick={() => setRenaming(true)}>
-            Rename
+        {!editing && (
+          <button type="button" onClick={() => setEditing(true)}>
+            Edit
           </button>
         )}
       </div>
 
-      {renaming && (
+      {editing ? (
         <form
-          className="search"
+          className="edit-form"
           onSubmit={(e) => {
             e.preventDefault()
-            saveName()
+            save()
           }}
         >
-          <input
-            className="text-input"
-            type="text"
-            value={name}
-            aria-label="Exercise name"
-            onChange={(e) => {
-              setName(e.target.value)
-              setError(null)
-            }}
-          />
-          <button type="submit" className="primary">
-            Save
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setRenaming(false)
-              setName(exercise.name)
-              setError(null)
-            }}
-          >
-            Cancel
-          </button>
+          <label className="field">
+            <span className="field-label">Name</span>
+            <input
+              className="text-input"
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value)
+                setError(null)
+              }}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">Description</span>
+            <textarea
+              className="text-input"
+              rows={3}
+              value={description}
+              placeholder="e.g. Seat height 4, back pad 2"
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </label>
+          {error && <p className="notice error">{error}</p>}
+          <div className="actions">
+            <button type="submit" className="primary">
+              Save
+            </button>
+            <button type="button" onClick={cancel}>
+              Cancel
+            </button>
+          </div>
         </form>
+      ) : (
+        exercise.description && <p className="description">{exercise.description}</p>
       )}
-      {error && <p className="notice error">{error}</p>}
 
       <p className="notice">
         {usedIn.length > 0
-          ? `In training days: ${usedIn.map((d) => d.name).join(', ')}`
-          : 'Not in any training day.'}
+          ? `In plans: ${usedIn.map((d) => d.name).join(', ')}`
+          : 'Not in any plan.'}
       </p>
 
       {points.length === 0 ? (
-        <p className="notice">No workouts with this exercise yet. Its progress will show up here.</p>
+        <p className="notice">Not tracked yet. Its progress will show up here.</p>
       ) : (
         <>
           <div className="segmented" role="group" aria-label="Measure">
@@ -130,8 +147,8 @@ export function ExerciseView({ exercise, diary, onBack, onRename, onDelete }: Ex
           label="Delete exercise"
           question={
             usedIn.length > 0
-              ? 'Delete it and remove it from its training days? Past workouts keep it.'
-              : 'Delete it? Past workouts keep it.'
+              ? 'Delete it and remove it from its plans? Tracked training days keep it.'
+              : 'Delete it? Tracked training days keep it.'
           }
           confirmLabel="Delete"
           onConfirm={onDelete}

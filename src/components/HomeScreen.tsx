@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { dayFilters, recentWorkouts, type ActiveWorkout, type Diary } from '../diary'
-import { formatDate, plural, summarizeSets } from '../ui/format'
+import { formatDate, formatKg, plural, summarizeSets } from '../ui/format'
 import { Dialog } from './Dialog'
 
 interface HomeScreenProps {
   diary: Diary
   active: ActiveWorkout | null
-  /** Training day ids to show; empty = all. */
+  /** Plan ids to show; empty = all. */
   filter: ReadonlySet<string>
   onFilterChange: (filter: Set<string>) => void
   onStart: (dayId: string) => void
@@ -15,7 +15,10 @@ interface HomeScreenProps {
   onCreateDay: () => void
 }
 
-/** Recorded workouts, newest first, with a training-day filter and the Start button. */
+/**
+ * Tracked training days, newest first, with a filter by plan and the button to
+ * track a new one.
+ */
 export function HomeScreen({
   diary,
   active,
@@ -42,23 +45,23 @@ export function HomeScreen({
     <section className="screen">
       {active ? (
         <button type="button" className="primary start" onClick={onResume}>
-          Resume {active.editing ? 'editing' : 'workout'}: {active.workout.dayName}
+          {active.editing ? 'Resume editing' : 'Resume'}: {active.workout.dayName}
         </button>
       ) : diary.days.length > 0 ? (
         <button type="button" className="primary start" onClick={() => setChoosing(true)}>
-          Start workout
+          Track a training day
         </button>
       ) : (
         <div className="empty">
-          <p className="notice">Create a training day (e.g. Push, Pull, Legs) to start your first workout.</p>
+          <p className="notice">Create a plan (e.g. Push, Pull, Legs) to track your first training day.</p>
           <button type="button" className="primary" onClick={onCreateDay}>
-            + New training day
+            + New plan
           </button>
         </div>
       )}
 
       {filters.length > 1 && (
-        <div className="chips" role="group" aria-label="Show training days">
+        <div className="chips" role="group" aria-label="Show plans">
           <button type="button" aria-pressed={filter.size === 0} onClick={() => onFilterChange(new Set())}>
             All
           </button>
@@ -72,7 +75,7 @@ export function HomeScreen({
 
       {workouts.length === 0 ? (
         <p className="notice">
-          {diary.workouts.length === 0 ? 'No workouts recorded yet.' : 'No workouts for these training days.'}
+          {diary.workouts.length === 0 ? 'No training days tracked yet.' : 'No training days for these plans.'}
         </p>
       ) : (
         <ul className="list">
@@ -83,6 +86,7 @@ export function HomeScreen({
                   <span className="row-title">{w.dayName}</span>
                   <span className="muted">{formatDate(w.date)}</span>
                 </span>
+                {w.bodyWeight && <span className="row-sub">Body weight {formatKg(w.bodyWeight)} kg</span>}
                 {w.entries.length === 0 ? (
                   <span className="row-sub">No exercises logged</span>
                 ) : (
@@ -102,7 +106,7 @@ export function HomeScreen({
       )}
 
       {choosing && (
-        <Dialog title="Which training day?" onClose={() => setChoosing(false)}>
+        <Dialog title="Which plan?" onClose={() => setChoosing(false)}>
           <ul className="list picker-list">
             {diary.days.map((d) => (
               <li key={d.id}>

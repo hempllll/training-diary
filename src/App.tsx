@@ -6,6 +6,7 @@ import { DaysScreen } from './components/DaysScreen'
 import { ExercisesScreen } from './components/ExercisesScreen'
 import { ExerciseView } from './components/ExerciseView'
 import { HomeScreen } from './components/HomeScreen'
+import { LoadErrorScreen } from './components/LoadErrorScreen'
 import { NavBar, type Tab } from './components/NavBar'
 import { WorkoutRunner } from './components/WorkoutRunner'
 import { WorkoutView } from './components/WorkoutView'
@@ -27,6 +28,7 @@ import {
 import { useDiary } from './hooks/useDiary'
 import { exportDiary, LocalStorageDiaryRepository, type DiaryRepository } from './storage'
 import { downloadText } from './ui/download'
+import { formatDate } from './ui/format'
 
 /** Everything external is injectable so tests can run the real UI in memory. */
 export interface AppProps {
@@ -62,12 +64,13 @@ const TAB_VIEW: Record<Tab, View> = {
 
 function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   const [repo] = useState<DiaryRepository>(() => repoProp ?? new LocalStorageDiaryRepository())
-  const { diary, active, update, setActive } = useDiary(repo)
+  const { diary, active, loadError, update, setActive } = useDiary(repo)
   const [view, setView] = useState<View>({ name: 'home' })
   const [filter, setFilter] = useState<Set<string>>(new Set())
   const [backupOpen, setBackupOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
+  if (loadError) return <LoadErrorScreen error={loadError} today={localDate(now())} />
   if (!diary) return <p className="notice loading">Loading…</p>
 
   /** Create and store a new exercise (from a picker), returning it right away. */
@@ -91,7 +94,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
     const workout = finishWorkout(active)
     void update((d) => saveWorkout(d, workout))
     void setActive(null)
-    setMessage(`Saved ${workout.dayName} workout.`)
+    setMessage(`Saved ${workout.dayName} (${formatDate(workout.date)}).`)
     setView(active.editing ? { name: 'workout', id: workout.id } : { name: 'home' })
   }
 
@@ -140,7 +143,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
             }}
             onDelete={() => {
               void update((x) => deleteWorkout(x, workout.id))
-              setMessage('Workout deleted.')
+              setMessage('Training day deleted.')
               setView({ name: 'home' })
             }}
           />
@@ -156,7 +159,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
             exercise={exercise}
             diary={d}
             onBack={() => setView({ name: 'exercises' })}
-            onRename={(name) => void update((x) => saveExercise(x, { ...exercise, name }))}
+            onSave={(changes) => void update((x) => saveExercise(x, { ...exercise, ...changes }))}
             onDelete={() => {
               void update((x) => deleteExercise(x, exercise.id))
               setMessage(`Deleted ${exercise.name}.`)

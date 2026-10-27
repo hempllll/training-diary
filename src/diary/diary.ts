@@ -35,8 +35,12 @@ function upsert<T extends { id: string }>(list: T[], item: T): T[] {
 
 // --- exercises -------------------------------------------------------------
 
+/** Insert or update an exercise; names are trimmed and an empty description dropped. */
 export function saveExercise(diary: Diary, exercise: Exercise): Diary {
-  return { ...diary, exercises: upsert(diary.exercises, { ...exercise, name: exercise.name.trim() }) }
+  const { description, ...rest } = exercise
+  const saved: Exercise = { ...rest, name: exercise.name.trim() }
+  if (description?.trim()) saved.description = description.trim()
+  return { ...diary, exercises: upsert(diary.exercises, saved) }
 }
 
 /**

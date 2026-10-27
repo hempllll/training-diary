@@ -5,7 +5,7 @@ import { Dialog } from './Dialog'
 interface ExercisePickerProps {
   title: string
   exercises: Exercise[]
-  /** Exercises not to offer (e.g. already in the training day). */
+  /** Exercises not to offer (e.g. already in the plan). */
   excludeIds?: string[]
   onPick: (exercise: Exercise) => void
   /** Create a new exercise from the typed name and pick it. */

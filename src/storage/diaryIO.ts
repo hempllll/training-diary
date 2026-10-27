@@ -1,26 +1,40 @@
 /**
- * JSON export/import of the whole diary (the backup path: an installed iOS PWA
- * has its own storage, and clearing it would lose everything).
+ * The diary's JSON format, used both for the copy in localStorage and for
+ * backup files (the backup path: an installed iOS PWA has its own storage, and
+ * clearing it would lose everything).
  *
- * Export wraps the diary with a format tag and version so files stay
- * recognisable and upgradeable. Import validates untrusted file contents by
- * hand (no schema library) and throws a clear error on the first problem, so a
- * bad file can never corrupt the store.
+ * The diary is wrapped with a format tag and version so data stays
+ * recognisable and upgradeable. Reading validates by hand (no schema library)
+ * and throws a clear error on the first problem, so bad data can never
+ * corrupt the store. Fields this version doesn't know are kept, not dropped.
+ *
+ * Format versions — every one must stay readable, and each has fixtures in
+ * __tests__/fixtures that compatibility.test.ts loads:
+ *   1  first release. The stored copy was the bare diary, without wrapper.
+ *   2  optional `Exercise.description` and `Workout.bodyWeight`; the stored
+ *      copy is wrapped like an export.
+ * A change that isn't purely additive must convert older versions in
+ * `readDiary` before validation.
  */
 import type { Diary, SetEntry, TrainingDay, Workout, WorkoutEntry } from '../diary'
 
 const FORMAT = 'training-diary/diary'
-const VERSION = 1
+export const FORMAT_VERSION = 2
 
 interface DiaryFile extends Diary {
   format: typeof FORMAT
   version: number
 }
 
+/** Serialise the diary with its format tag; `pretty` indents it for a download. */
+export function serializeDiary(diary: Diary, pretty = false): string {
+  const file: DiaryFile = { format: FORMAT, version: FORMAT_VERSION, ...diary }
+  return JSON.stringify(file, null, pretty ? 2 : undefined)
+}
+
 /** Serialise the diary to a pretty-printed JSON string for download. */
 export function exportDiary(diary: Diary): string {
-  const file: DiaryFile = { format: FORMAT, version: VERSION, ...diary }
-  return JSON.stringify(file, null, 2)
+  return serializeDiary(diary, true)
 }
 
 class ImportError extends Error {}
@@ -73,10 +87,26 @@ function validateEntry(value: unknown, where: string): WorkoutEntry {
   return value as unknown as WorkoutEntry
 }
 
+function validateExercise(value: unknown, where: string): Diary['exercises'][number] {
+  const e = object(value, where)
+  string(e, 'id', where)
+  string(e, 'name', where)
+  if (e.description !== undefined && typeof e.description !== 'string') {
+    fail(`${where}.description must be text`)
+  }
+  return value as unknown as Diary['exercises'][number]
+}
+
 function validateWorkout(value: unknown, where: string): Workout {
   const w = object(value, where)
   for (const key of ['id', 'dayId', 'dayName', 'startedAt']) string(w, key, where)
   if (!isDate(w.date)) fail(`${where}.date must be a YYYY-MM-DD date`)
+  if (
+    w.bodyWeight !== undefined &&
+    (typeof w.bodyWeight !== 'number' || !Number.isFinite(w.bodyWeight) || w.bodyWeight <= 0)
+  ) {
+    fail(`${where}.bodyWeight must be a number > 0`)
+  }
   array(w.entries, `${where}.entries`).forEach((e, i) => validateEntry(e, `${where}.entries[${i}]`))
   return value as unknown as Workout
 }
@@ -101,9 +131,10 @@ function uniqueIds(items: { id: string }[], where: string): void {
 
 /**
  * Parse and validate a diary JSON document (an exported file or the stored
- * copy). Throws with a descriptive message on any problem.
+ * copy, of any version so far). Returns the diary and the format version it
+ * was written in. Throws with a descriptive message on any problem.
  */
-export function parseDiary(text: string): Diary {
+export function readDiary(text: string): { diary: Diary; version: number } {
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
@@ -112,13 +143,18 @@ export function parseDiary(text: string): Diary {
   }
   const root = object(parsed, 'The file')
   if (root.format !== undefined && root.format !== FORMAT) fail('This is not a training diary backup')
+  // v1 stored the bare diary: no format tag and no version.
+  const version = root.version ?? 1
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+    fail('Unknown data version')
+  }
+  if (version > FORMAT_VERSION) {
+    fail('This data comes from a newer version of the app. Reload the app to update it.')
+  }
+  // Convert older versions here once a change isn't purely additive. So far
+  // versions only added optional fields, so older data validates as is.
 
-  const exercises = array(root.exercises, 'exercises').map((value, i) => {
-    const e = object(value, `exercises[${i}]`)
-    string(e, 'id', `exercises[${i}]`)
-    string(e, 'name', `exercises[${i}]`)
-    return { id: e.id as string, name: e.name as string }
-  })
+  const exercises = array(root.exercises, 'exercises').map((e, i) => validateExercise(e, `exercises[${i}]`))
   const days = array(root.days, 'days').map((d, i) => validateDay(d, `days[${i}]`))
   const workouts = array(root.workouts, 'workouts').map((w, i) => validateWorkout(w, `workouts[${i}]`))
 
@@ -126,5 +162,10 @@ export function parseDiary(text: string): Diary {
   uniqueIds(days, 'days')
   uniqueIds(workouts, 'workouts')
 
-  return { exercises, days, workouts }
+  return { diary: { exercises, days, workouts }, version }
+}
+
+/** `readDiary` without the version. */
+export function parseDiary(text: string): Diary {
+  return readDiary(text).diary
 }
