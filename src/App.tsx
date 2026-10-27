@@ -227,7 +227,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   const focused = (view.name === 'run' && active !== null) || view.name === 'day'
 
   return (
-    <div className="app">
+    <div className={focused ? 'app' : 'app has-tab-bar'}>
       {!focused && (
         <header className="app-header">
           <h1>Training Diary</h1>
