@@ -14,13 +14,14 @@
  *   2  optional `Exercise.description` and `Workout.bodyWeight`; the stored
  *      copy is wrapped like an export.
  *   3  optional `Workout.description`; plans may have no exercises (rest days).
+ *   4  optional `SetEntry.failure` (set done to failure).
  * A change that isn't purely additive must convert older versions in
  * `readDiary` before validation.
  */
 import type { Diary, SetEntry, TrainingDay, Workout, WorkoutEntry } from '../diary'
 
 const FORMAT = 'training-diary/diary'
-export const FORMAT_VERSION = 3
+export const FORMAT_VERSION = 4
 
 interface DiaryFile extends Diary {
   format: typeof FORMAT
@@ -71,7 +72,8 @@ function validateSet(value: unknown, where: string): SetEntry {
   if (typeof s.reps !== 'number' || !Number.isInteger(s.reps) || s.reps < 0) {
     fail(`${where}.reps must be a whole number >= 0`)
   }
-  return { weight: s.weight, reps: s.reps }
+  if (s.failure !== undefined && typeof s.failure !== 'boolean') fail(`${where}.failure must be true or false`)
+  return value as unknown as SetEntry
 }
 
 function validateEntry(value: unknown, where: string): WorkoutEntry {

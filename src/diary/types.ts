@@ -35,6 +35,8 @@ export interface TrainingDay {
 export interface SetEntry {
   weight: number
   reps: number
+  /** Done to failure (no further rep possible). Only stored when true; missing before v4. */
+  failure?: boolean
 }
 
 /** What was done for one exercise during a workout. */

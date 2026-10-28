@@ -1,5 +1,7 @@
+import { useState, type AnimationEvent } from 'react'
 import { dayFilters, recentWorkouts, type ActiveWorkout, type Diary } from '../diary'
 import { formatDate, formatKg, setGroups } from '../ui/format'
+import { WorkoutMenu } from './WorkoutMenu'
 
 interface HomeScreenProps {
   diary: Diary
@@ -11,14 +13,19 @@ interface HomeScreenProps {
   expanded: ReadonlySet<string>
   onExpandedChange: (expanded: Set<string>) => void
   onResume: () => void
-  onOpenWorkout: (id: string) => void
+  onEditWorkout: (id: string) => void
+  onDeleteWorkout: (id: string) => void
   onCreateDay: () => void
 }
 
+/** Whether cards may animate opening and closing (not under reduced motion). */
+const animates = () => window.matchMedia?.('(prefers-reduced-motion: no-preference)').matches ?? false
+
 /**
  * Tracked training days, newest first, with a filter by plan (a new one is
- * tracked with the header's + button). Each card shows the plan, date and body weight; tapping it
- * opens it up to show the exercises and description (several can be open).
+ * tracked with the header's + button). Each card shows the plan, date and body
+ * weight; tapping it opens it up (smoothly, several at once) to show the
+ * description and exercises, with a ⋯ menu to edit or delete the day.
  */
 export function HomeScreen({
   diary,
@@ -28,9 +35,12 @@ export function HomeScreen({
   expanded,
   onExpandedChange,
   onResume,
-  onOpenWorkout,
+  onEditWorkout,
+  onDeleteWorkout,
   onCreateDay,
 }: HomeScreenProps) {
+  // Cards playing their closing animation; they leave `expanded` when it ends.
+  const [closing, setClosing] = useState<ReadonlySet<string>>(new Set())
   const filters = dayFilters(diary)
   const workouts = recentWorkouts(diary.workouts, filter)
   const exerciseName = new Map(diary.exercises.map((e) => [e.id, e.name]))
@@ -41,6 +51,18 @@ export function HomeScreen({
     if (next.has(id)) next.delete(id)
     else next.add(id)
     return next
+  }
+
+  function toggle(id: string) {
+    if (closing.has(id)) setClosing(toggled(closing, id)) // tapped again while closing: stay open
+    else if (expanded.has(id) && animates()) setClosing(toggled(closing, id))
+    else onExpandedChange(toggled(expanded, id))
+  }
+
+  function closed(id: string, e: AnimationEvent) {
+    if (e.animationName !== 'card-close' || !closing.has(id)) return
+    setClosing(toggled(closing, id))
+    onExpandedChange(toggled(expanded, id))
   }
 
   return (
@@ -80,8 +102,25 @@ export function HomeScreen({
       ) : (
         <ul className="list">
           {workouts.map((w) => {
-            const open = expanded.has(w.id)
+            const shown = expanded.has(w.id)
+            const open = shown && !closing.has(w.id)
             const bodyId = `workout-${w.id}`
+            const exerciseLines = w.entries.map((e, i) => (
+              <li key={i} className="entry-line">
+                <span>
+                  {exerciseName.get(e.exerciseId) ?? e.exerciseName}
+                  {e.replaces && <span className="entry-note">instead of {e.replaces.exerciseName}</span>}
+                  {e.extra && !e.replaces && <span className="entry-note">added that day</span>}
+                </span>
+                <span className="muted">
+                  {setGroups(e.sets).map((g, j) => (
+                    <span key={j} className="set-group">
+                      {g}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            ))
             return (
               <li key={w.id} className="card">
                 <button
@@ -89,7 +128,7 @@ export function HomeScreen({
                   className="card-toggle"
                   aria-expanded={open}
                   aria-controls={bodyId}
-                  onClick={() => onExpandedChange(toggled(expanded, w.id))}
+                  onClick={() => toggle(w.id)}
                 >
                   <span className="card-head">
                     <span className="row-title">{w.dayName}</span>
@@ -100,30 +139,31 @@ export function HomeScreen({
                   </span>
                   {w.bodyWeight && <span className="row-sub">Body weight {formatKg(w.bodyWeight)} kg</span>}
                 </button>
-                {open && (
-                  <div id={bodyId} className="card-body">
-                    {w.description && <p className="card-description">{w.description}</p>}
-                    {w.entries.length === 0 ? (
-                      <p className="row-sub">No exercises</p>
-                    ) : (
-                      <ul className="entry-lines">
-                        {w.entries.map((e, i) => (
-                          <li key={i} className="entry-line">
-                            <span>{exerciseName.get(e.exerciseId) ?? e.exerciseName}</span>
-                            <span className="muted">
-                              {setGroups(e.sets).map((g, j) => (
-                                <span key={j} className="set-group">
-                                  {g}
-                                </span>
-                              ))}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    <button type="button" className="card-open" onClick={() => onOpenWorkout(w.id)}>
-                      Details ›
-                    </button>
+                {shown && (
+                  // The outer grid row grows from 0 to the content's height
+                  // (card-open / card-close in App.css); the clip hides the rest.
+                  <div
+                    id={bodyId}
+                    className={open ? 'card-body' : 'card-body closing'}
+                    inert={!open}
+                    onAnimationEnd={(e) => closed(w.id, e)}
+                  >
+                    <div className="card-body-clip">
+                      <div className="card-body-content">
+                        {w.description && <p className="card-description">{w.description}</p>}
+                        {w.entries.length === 0 ? (
+                          <p className="row-sub">No exercises</p>
+                        ) : (
+                          <ul className="entry-lines">{exerciseLines}</ul>
+                        )}
+                        <WorkoutMenu
+                          label={`${w.dayName}, ${formatDate(w.date)}`}
+                          canEdit={!active}
+                          onEdit={() => onEditWorkout(w.id)}
+                          onDelete={() => onDeleteWorkout(w.id)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </li>

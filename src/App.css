@@ -157,6 +157,24 @@ button.icon {
   transform-origin: top left;
   animation: menu-open 0.3s var(--spring);
 }
+/* A training day's ⋯ menu, fixed above its button (WorkoutMenu sets right
+   and bottom). */
+.day-menu {
+  position: fixed;
+  top: auto;
+  left: auto;
+  max-width: 15rem;
+  transform-origin: bottom right;
+}
+.menu-note {
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.menu .danger-item {
+  color: var(--error);
+}
 @keyframes menu-open {
   from {
     opacity: 0;
@@ -309,20 +327,45 @@ main {
 .card-toggle[aria-expanded='true'] .chevron {
   rotate: 90deg;
 }
+/* The opened part grows smoothly to its height and shrinks back when closed
+   (HomeScreen removes it once card-close ends). A grid row can animate from
+   0fr to 1fr, i.e. from nothing to the content's own height. */
 .card-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: card-open 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.card-body.closing {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  animation: card-close 0.24s cubic-bezier(0.4, 0, 0.6, 1);
+}
+.card-body-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.card-body-content {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 0 0.75rem 0.65rem;
-  animation: card-open 0.2s ease-out;
 }
 .card-body p {
   margin: 0;
 }
 @keyframes card-open {
   from {
+    grid-template-rows: 0fr;
     opacity: 0;
-    translate: 0 -0.3rem;
+  }
+  40% {
+    opacity: 0.6;
+  }
+}
+@keyframes card-close {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
   }
 }
 .card-open {
@@ -373,15 +416,25 @@ main {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+/* "instead of Incline press" under a replaced exercise. */
+.entry-note {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+/* The ⋯ button at the bottom right of an opened card. */
+.workout-menu {
+  align-self: flex-end;
+}
+.glass-button.more {
+  width: 2.3rem;
+  height: 2.3rem;
+  box-shadow: inset 0 1px 0 var(--glass-shine);
+}
 /* One line per weight used, so they line up under each other. */
 .set-group {
   display: block;
   white-space: nowrap;
-}
-.sets {
-  margin: 0;
-  padding-left: 1.4rem;
-  font-variant-numeric: tabular-nums;
 }
 .picker-list {
   max-height: 50vh;
@@ -781,6 +834,18 @@ main {
 }
 .sets-table td:last-child {
   width: 2.5rem;
+}
+/* "Failure" tick box per set; accent-color tints the native checkbox. */
+.sets-table .failure-col {
+  width: 3.6rem;
+  text-align: center;
+}
+.failure-box {
+  width: 1.4rem;
+  height: 1.4rem;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--accent);
 }
 .number-input {
   width: 100%;

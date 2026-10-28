@@ -50,15 +50,19 @@ export function parseNumber(text: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null
 }
 
-/** One set as "10 @ 60 kg" (or "10 reps" without weight). */
+/** A set's reps, with "f" when done to failure: "8f". */
+const repsOf = (set: SetEntry) => `${set.reps}${set.failure ? 'f' : ''}`
+
+/** One set as "10 @ 60 kg" (or "10 reps" without weight); "10f" if to failure. */
 export function formatSet(set: SetEntry): string {
-  return set.weight > 0 ? `${set.reps} @ ${formatKg(set.weight)} kg` : `${set.reps} reps`
+  return set.weight > 0 ? `${repsOf(set)} @ ${formatKg(set.weight)} kg` : `${repsOf(set)} reps`
 }
 
 /**
  * Sets in short form, one group per run of sets at the same weight, in the
  * order they were done: each set's reps, then the weight ("10 · 10 · 8 @ 60 kg").
- * Sets without weight have no "@".
+ * Sets done to failure get an "f" ("12f · 11 · 8f @ 50 kg"); sets without
+ * weight have no "@".
  */
 export function setGroups(sets: SetEntry[]): string[] {
   const runs: SetEntry[][] = []
@@ -69,7 +73,7 @@ export function setGroups(sets: SetEntry[]): string[] {
   }
   return runs.map((run) => {
     const { weight } = run[0]
-    const reps = run.map((s) => s.reps).join(' · ')
+    const reps = run.map(repsOf).join(' · ')
     return weight > 0 ? `${reps} @ ${formatKg(weight)} kg` : reps
   })
 }

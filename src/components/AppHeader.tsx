@@ -1,28 +1,11 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
+import { Icon } from './Icon'
 
 interface AppHeaderProps {
   /** What the + button does right now ("Track a training day", "New plan", …). */
   addLabel: string
   onAdd: () => void
   onBackup: () => void
-}
-
-/** A 24×24 line icon drawn with the text colour, like the tab bar's. */
-function Icon({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      className="header-icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  )
 }
 
 /**

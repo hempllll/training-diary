@@ -16,7 +16,6 @@ import { PlanStatsScreen } from './components/PlanStatsScreen'
 import { TAB_LABELS, type Tab } from './components/tabs'
 import { WeightStatsScreen } from './components/WeightStatsScreen'
 import { WorkoutRunner } from './components/WorkoutRunner'
-import { WorkoutView } from './components/WorkoutView'
 import {
   DEFAULT_REP_RANGE,
   deleteDay,
@@ -49,7 +48,6 @@ export interface AppProps {
 
 type View =
   | { name: 'home' }
-  | { name: 'workout'; id: string }
   | { name: 'run' }
   | { name: 'exercises' }
   | { name: 'exercise'; id: string }
@@ -82,7 +80,6 @@ const MAIN_VIEWS = TAB_ORDER.flatMap((tab) => PAGES[tab].map((p) => p.view))
 
 const TAB_OF: Record<View['name'], Tab> = {
   home: 'home',
-  workout: 'home',
   run: 'home',
   exercises: 'library',
   exercise: 'library',
@@ -103,7 +100,6 @@ const DEPTH: Record<View['name'], number> = {
   home: 0,
   exercises: 0,
   days: 0,
-  workout: 1,
   run: 1,
   exercise: 1,
   day: 1,
@@ -232,13 +228,13 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
     notify(`Saved ${workout.dayName} (${formatDate(workout.date)}).`)
     // Show what was just saved.
     setExpanded((cur) => new Set(cur).add(workout.id))
-    navigate(active.editing ? { name: 'workout', id: workout.id } : { name: 'home' })
+    navigate({ name: 'home' })
   }
 
   function handleDiscard() {
     if (!active) return
     void setActive(null)
-    navigate(active.editing ? { name: 'workout', id: active.workout.id } : { name: 'home' })
+    navigate({ name: 'home' })
   }
 
   // --- training days -------------------------------------------------------
@@ -264,28 +260,6 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
           createExercise={createExercise}
         />
       )
-    }
-    if (view.name === 'workout') {
-      const workout = d.workouts.find((w) => w.id === view.id)
-      if (workout) {
-        return (
-          <WorkoutView
-            workout={workout}
-            diary={d}
-            canEdit={!active}
-            onBack={() => navigate({ name: 'home' })}
-            onEdit={() => {
-              void setActive(editWorkout(workout))
-              navigate({ name: 'run' })
-            }}
-            onDelete={() => {
-              void update((x) => deleteWorkout(x, workout.id))
-              notify('Training day deleted.')
-              navigate({ name: 'home' })
-            }}
-          />
-        )
-      }
     }
     if (view.name === 'exercise') {
       const exercise = d.exercises.find((e) => e.id === view.id)
@@ -387,7 +361,17 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
         expanded={expanded}
         onExpandedChange={setExpanded}
         onResume={() => navigate({ name: 'run' })}
-        onOpenWorkout={(id) => navigate({ name: 'workout', id })}
+        onEditWorkout={(id) => {
+          const workout = d.workouts.find((w) => w.id === id)
+          if (!workout || active) return
+          void setActive(editWorkout(workout))
+          navigate({ name: 'run' })
+        }}
+        onDeleteWorkout={(id) => {
+          void update((x) => deleteWorkout(x, id))
+          setExpanded((cur) => new Set([...cur].filter((x) => x !== id)))
+          notify('Training day deleted.')
+        }}
         onCreateDay={() => navigate({ name: 'day', id: null, back: { name: 'home' } })}
       />
     )

@@ -79,11 +79,13 @@ At the top are the **settings gear** (left) and the **+** button (right).
 
 - All tracked training days, newest first. Each card shows the plan, the date and
   your body weight that day.
-- **Tap a card** to open it: it shows the day's description and every exercise with
-  its sets, written as *reps @ weight*, grouped by weight in the order done (e.g.
-  `12 @ 40 kg, 11 · 9 · 8 @ 50 kg`). Several cards can be open at once; the day you
-  just saved opens by itself.
-- **Details ›** shows the whole day, where you can **edit** or **delete** it.
+- **Tap a card** to open it: it unfolds smoothly to show the day's description and
+  every exercise with its sets, written as *reps @ weight*, grouped by weight in the
+  order done, with an **f** after sets done to failure (e.g.
+  `12 @ 40 kg, 11 · 9 · 8f @ 50 kg`). Replaced and added exercises are noted. Several
+  cards can be open at once; the day you just saved opens by itself.
+- The **⋯** button of an opened card has **Edit** and **Delete** (which asks once
+  more). Editing waits until the training day in progress is finished.
 - The chips at the top filter by plan (several at once); **All** shows everything.
   Plans you deleted still show up here if they were tracked.
 
@@ -95,6 +97,8 @@ At the top are the **settings gear** (left) and the **+** button (right).
   (kg) and reps, **pre-filled with what you did last time**, which is also shown
   above the sets. Add or remove sets as needed. Weights accept a decimal comma
   (`62,5`); 0 kg means a bodyweight exercise.
+- Tick **Failure** for a set you took to failure. Ticks aren't pre-filled from last
+  time, since that depends on the day.
 - The exercise's description (e.g. machine settings) is shown while you train it.
 - Jump between exercises with the row of names, or **Previous** / **Next**.
 - Machine taken or broken? **⇄ Replace** swaps the exercise for another one, **+ Add
