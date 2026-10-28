@@ -11,7 +11,7 @@ import {
   type Session,
   type Span,
 } from '../diary'
-import { daysAgo, formatDate, formatDecimal, formatKg, formatSet, formatVolume, summarizeSets } from '../ui/format'
+import { daysAgo, formatChange, formatDate, formatDecimal, formatKg, formatSet, formatVolume, summarizeSets } from '../ui/format'
 import { LineChart } from './LineChart'
 import { NumberField } from './NumberField'
 import { SpanPicker } from './SpanPicker'
@@ -30,9 +30,9 @@ interface ExerciseStatsScreenProps {
 }
 
 /**
- * One exercise's progress: the heaviest weight lifted for a chosen number of
- * reps over time (most reps for exercises without weight), totals and
- * records, and every session.
+ * One exercise's progress: its weight trend over time, one point per training
+ * day for the best set within a chosen rep range (most reps for exercises
+ * without weight), totals and records, and every session.
  */
 export function ExerciseStatsScreen({
   diary,
@@ -135,7 +135,10 @@ interface TrendProps {
   today: string
 }
 
-/** The chart with its controls: rep range (for weighted exercises) and time span. */
+/**
+ * The trend chart with its controls: rep range (for weighted exercises) and
+ * time span, and how much the weight changed over the span.
+ */
 function Trend({ sessions, bodyweightOnly, range, onRangeChange, span, onSpanChange, today }: TrendProps) {
   const lo = Math.min(range.min, range.max)
   const hi = Math.max(range.min, range.max)
@@ -143,31 +146,36 @@ function Trend({ sessions, bodyweightOnly, range, onRangeChange, span, onSpanCha
   const points = trend.map((p) =>
     bodyweightOnly
       ? { id: p.workoutId, date: p.date, value: p.set.reps }
-      : { id: p.workoutId, date: p.date, value: p.set.weight, detail: `× ${p.set.reps}` },
+      : { id: p.workoutId, date: p.date, value: p.set.weight, detail: `× ${p.set.reps} reps` },
   )
+  const first = points[0]
+  const last = points.at(-1)
 
   return (
     <>
       {bodyweightOnly ? (
         <h3 className="section-title">Most reps in a set</h3>
       ) : (
-        <div className="rep-range">
-          <h3 className="section-title">Heaviest set with</h3>
-          <NumberField
-            integer
-            label="Fewest reps"
-            value={range.min}
-            onChange={(min) => onRangeChange({ ...range, min: min ?? 0 })}
-          />
-          <span aria-hidden="true">–</span>
-          <NumberField
-            integer
-            label="Most reps"
-            value={range.max}
-            onChange={(max) => onRangeChange({ ...range, max: max ?? 0 })}
-          />
-          <span>reps</span>
-        </div>
+        <>
+          <h3 className="section-title">Weight trend</h3>
+          <div className="rep-range">
+            <span className="rep-range-label">Best set per training day with</span>
+            <NumberField
+              integer
+              label="Fewest reps"
+              value={range.min}
+              onChange={(min) => onRangeChange({ ...range, min: min ?? 0 })}
+            />
+            <span aria-hidden="true">–</span>
+            <NumberField
+              integer
+              label="Most reps"
+              value={range.max}
+              onChange={(max) => onRangeChange({ ...range, max: max ?? 0 })}
+            />
+            <span>reps</span>
+          </div>
+        </>
       )}
       <SpanPicker span={span} onChange={onSpanChange} />
       {points.length === 0 ? (
@@ -179,14 +187,14 @@ function Trend({ sessions, bodyweightOnly, range, onRangeChange, span, onSpanCha
       ) : (
         <LineChart
           points={points}
-          label={bodyweightOnly ? 'Most reps' : `Heaviest set with ${lo}–${hi} reps`}
+          label={bodyweightOnly ? 'Most reps' : `Weight trend, ${lo}–${hi} reps`}
           unit={bodyweightOnly ? 'reps' : 'kg'}
         />
       )}
-      {!bodyweightOnly && points.length > 0 && (
+      {!bodyweightOnly && first && last && first !== last && (
         <p className="notice">
-          Best: {formatKg(Math.max(...points.map((p) => p.value)))} kg with {lo}–{hi} reps
-          {span === 'all' ? '' : ' in this time span'}.
+          {formatChange(last.value - first.value)} since {formatDate(first.date)} ({formatKg(first.value)} →{' '}
+          {formatKg(last.value)} kg).
         </p>
       )}
     </>

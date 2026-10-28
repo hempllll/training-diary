@@ -615,8 +615,10 @@ describe('stats', () => {
     // Starts with the exercise done most recently.
     const exercise = screen.getByRole('combobox', { name: 'Exercise' })
     expect(exercise).toHaveDisplayValue('Bench press')
-    expect(screen.getByRole('img', { name: 'Heaviest set with 8–12 reps over time, 2 values' })).toBeInTheDocument()
-    expect(screen.getByText('Best: 62.5 kg with 8–12 reps.')).toBeInTheDocument()
+    // One point per training day: its best set with 8–12 reps.
+    expect(screen.getByRole('img', { name: 'Weight trend, 8–12 reps over time, 2 values' })).toBeInTheDocument()
+    expect(screen.getByText('62.5 kg')).toBeInTheDocument() // the newest is selected
+    expect(screen.getByText('+2.5 kg since Tue 20 Oct (60 → 62.5 kg).')).toBeInTheDocument()
     expect(tile('Heaviest set')).toHaveTextContent('5 @ 70 kgMon 26 Oct')
     expect(tile('Done')).toHaveTextContent('2×')
     expect(screen.getByText('5 @ 70 kg, 9 @ 62.5 kg')).toBeInTheDocument() // history
@@ -625,7 +627,7 @@ describe('stats', () => {
     await user.type(screen.getByLabelText('Fewest reps'), '1')
     await user.clear(screen.getByLabelText('Most reps'))
     await user.type(screen.getByLabelText('Most reps'), '5')
-    expect(screen.getByRole('img', { name: 'Heaviest set with 1–5 reps over time, 1 values' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Weight trend, 1–5 reps over time, 1 values' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '1M' }))
     expect(screen.getByRole('button', { name: '1M' })).toHaveAttribute('aria-pressed', 'true')
 

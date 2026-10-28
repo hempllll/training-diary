@@ -11,7 +11,7 @@ device.
 <p>
   <img src="docs/screenshots/home.png" width="200" alt="Training days: tracked days newest first, one opened to show its exercises">
   <img src="docs/screenshots/tracking.png" width="200" alt="Tracking a Push day: sets of the bench press, pre-filled from last time">
-  <img src="docs/screenshots/stats-exercise.png" width="200" alt="Exercise stats: the bench press's heaviest set with 8 to 12 reps over time">
+  <img src="docs/screenshots/stats-exercise.png" width="200" alt="Exercise stats: the bench press's weight trend with 8 to 12 reps">
 </p>
 <p>
   <img src="docs/screenshots/stats-body-weight.png" width="200" alt="Body weight over three months with the 7-day average line">
@@ -129,8 +129,9 @@ The glass menu at the top switches between **Exercises** and **Plans**.
 The glass menu at the top switches between **Exercises**, **Plans** and **Body weight**.
 
 - **Exercises:** pick an exercise (deleted ones with tracked sets are listed too).
-  The chart shows the **heaviest set within a rep range** at every training day;
-  the range is yours to choose (8–12 reps to start with). Exercises done without
+  The chart shows its **weight trend** over time: one point per training day, at
+  the weight of the best set within a rep range you choose (8–12 reps to start
+  with), and how much it changed over the time span. Exercises done without
   weight chart their most reps per set instead. Below: how often it was done (and
   per week, in the weeks it was done), first and last time, heaviest set, best
   estimated one-rep max (Epley formula), total sets, reps and volume (weight × reps),

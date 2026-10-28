@@ -998,15 +998,13 @@ textarea.text-input {
 .plan-stats .stat {
   background: var(--bg);
 }
-/* "Heaviest set with [8] – [12] reps" on one line. */
+/* "Best set per training day with [8] – [12] reps" on one line. */
 .rep-range {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  margin-top: 0.5rem;
 }
-.rep-range .section-title {
-  margin: 0;
+.rep-range-label {
   flex: 1;
 }
 .rep-range .number-input {
