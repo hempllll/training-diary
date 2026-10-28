@@ -129,6 +129,25 @@ describe('upgrading v1 data', () => {
   })
 })
 
+describe('sets to failure (v4)', () => {
+  it('keep their mark through loading, saving and resuming', async () => {
+    const storage = storageWith(4)
+    const repo = new LocalStorageDiaryRepository(storage)
+    await repo.save(await repo.load())
+    const sets = (await repo.load()).workouts.flatMap((w) => w.entries.flatMap((e) => e.sets))
+    expect(sets.filter((s) => s.failure)).toHaveLength(2)
+    const active = await repo.loadActive()
+    expect(active!.workout.entries[0].sets[0].failure).toBe(true)
+  })
+
+  it('don’t exist in older data', async () => {
+    for (const version of [1, 2, 3]) {
+      const diary = await new LocalStorageDiaryRepository(storageWith(version)).load()
+      expect(diary.workouts.flatMap((w) => w.entries.flatMap((e) => e.sets)).some((s) => 'failure' in s)).toBe(false)
+    }
+  })
+})
+
 describe('data the current version can’t read', () => {
   it.each([
     ['broken JSON', '{"exercises": [', 'not valid JSON'],

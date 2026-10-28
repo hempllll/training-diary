@@ -61,6 +61,8 @@ describe('export / import', () => {
     expect(() => parseDiary(JSON.stringify(bad))).toThrow('workouts[0].entries[0].sets[0].weight')
     bad.workouts[0].entries[0].sets[0] = { weight: 5, reps: 2.5 }
     expect(() => parseDiary(JSON.stringify(bad))).toThrow('reps must be a whole number')
+    bad.workouts[0].entries[0].sets[0] = { weight: 5, reps: 8, failure: 'yes' }
+    expect(() => parseDiary(JSON.stringify(bad))).toThrow('sets[0].failure must be true or false')
   })
 })
 

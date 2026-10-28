@@ -44,13 +44,27 @@ export function lastEntry(
   return null
 }
 
+/**
+ * A new set with the weight and reps of `set`. Whether it goes to failure is
+ * only known once it is done, so that isn't copied.
+ */
+export function nextSet({ weight, reps }: SetEntry): SetEntry {
+  return { weight, reps }
+}
+
+/** `set` marked as done to failure, or not (then without the field). */
+export function withFailure(set: SetEntry, failure: boolean): SetEntry {
+  const { failure: _, ...rest } = set
+  return failure ? { ...rest, failure: true } : rest
+}
+
 /** A fresh entry for an exercise, pre-filled with what was done last time. */
 export function newEntry(exercise: Exercise, workouts: Workout[]): WorkoutEntry {
   const last = lastEntry(workouts, exercise.id)
   return {
     exerciseId: exercise.id,
     exerciseName: exercise.name,
-    sets: (last?.entry.sets ?? DEFAULT_SETS).map((s) => ({ ...s })),
+    sets: (last?.entry.sets ?? DEFAULT_SETS).map(nextSet),
   }
 }
 

@@ -71,6 +71,11 @@ const workoutCards = () => [...document.querySelectorAll('.card-toggle .row-titl
 /** Open a home card by its plan name, e.g. /^Pull/. */
 const expandCard = (user: ReturnType<typeof userEvent.setup>, name: RegExp) =>
   user.click(screen.getByRole('button', { name, expanded: false }))
+/** Open the ⋯ menu of an opened card, e.g. 'Pull, Thu 22 Oct'. */
+async function cardMenu(user: ReturnType<typeof userEvent.setup>, label: string) {
+  await user.click(screen.getByRole('button', { name: `More for ${label}` }))
+  return within(screen.getByRole('menu', { name: label }))
+}
 
 describe('home screen', () => {
   it('lists workouts newest first and filters by training day', async () => {
@@ -96,16 +101,78 @@ describe('home screen', () => {
     expect(within(filters).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('opens a workout and deletes it', async () => {
+  it('deletes a training day from its ⋯ menu, after asking', async () => {
     const { user, repo } = await renderApp()
     await expandCard(user, /^Pull/)
-    await user.click(screen.getByRole('button', { name: 'Details ›' }))
-    expect(screen.getByRole('heading', { name: /Pull/ })).toBeInTheDocument()
     expect(screen.getByText('10 @ 50 kg')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
-    await user.click(within(screen.getByRole('group', { name: 'Delete this training day?' })).getByRole('button', { name: 'Delete' }))
+    let menu = await cardMenu(user, 'Pull, Thu 22 Oct')
+    await user.click(menu.getByRole('menuitem', { name: 'Delete…' }))
+    expect(menu.getByText('Delete this training day?')).toBeInTheDocument()
+    await user.click(menu.getByRole('menuitem', { name: 'Cancel' }))
+    await user.click(menu.getByRole('menuitem', { name: 'Delete…' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect((await repo.load()).workouts).toHaveLength(2)
+
+    menu = await cardMenu(user, 'Pull, Thu 22 Oct')
+    await user.click(menu.getByRole('menuitem', { name: 'Delete…' }))
+    await user.click(menu.getByRole('menuitem', { name: 'Delete' }))
     expect(screen.getByText('Training day deleted.')).toBeInTheDocument()
+    expect(workoutCards()).toEqual(['Push'])
     expect((await repo.load()).workouts.map((w) => w.id)).toEqual(['w-push'])
+  })
+
+  it('shows replaced and added exercises in an opened card', async () => {
+    const diary = structuredClone(seeded)
+    diary.workouts[0].entries.push(
+      { exerciseId: 'row', exerciseName: 'Barbell row', sets: [], extra: true },
+      {
+        exerciseId: 'incline',
+        exerciseName: 'Incline press',
+        sets: [],
+        replaces: { exerciseId: 'flys', exerciseName: 'Cable flys' },
+      },
+    )
+    const { user } = await renderApp(diary)
+    await expandCard(user, /^Push/)
+    expect(screen.getByText('added that day')).toBeInTheDocument()
+    expect(screen.getByText('instead of Cable flys')).toBeInTheDocument()
+  })
+
+  it('opens and closes cards smoothly unless motion is reduced', async () => {
+    let reduced = false
+    window.matchMedia = ((query: string) => ({ matches: query.includes('no-preference') !== reduced })) as typeof window.matchMedia
+    try {
+      const { user } = await renderApp()
+      const card = () => screen.getByRole('button', { name: /^Pull.*22 Oct/ })
+      // jsdom has no AnimationEvent: React then listens for the prefixed
+      // webkitAnimationEnd, and a plain event needs the animation's name.
+      const animationEnd = (el: Element, animationName: string) =>
+        fireEvent(el, Object.assign(new Event('webkitAnimationEnd', { bubbles: true }), { animationName }))
+      await expandCard(user, /^Pull/)
+      const body = document.getElementById('workout-w-pull')!
+      expect(body).toHaveClass('card-body')
+      // Closing plays card-close first and keeps the content until it ends.
+      await user.click(card())
+      expect(card()).toHaveAttribute('aria-expanded', 'false')
+      expect(body).toHaveClass('closing')
+      animationEnd(body, 'menu-open') // a child's animation: ignored
+      expect(body).toBeInTheDocument()
+      // Tapped again while closing: it stays open.
+      await user.click(card())
+      expect(body).not.toHaveClass('closing')
+      await user.click(card())
+      animationEnd(body, 'card-close')
+      expect(screen.queryByText('Barbell row')).not.toBeInTheDocument()
+
+      reduced = true
+      await user.click(card())
+      await user.click(card())
+      expect(screen.queryByText('Barbell row')).not.toBeInTheDocument()
+    } finally {
+      // @ts-expect-error jsdom has no matchMedia; remove the stub again.
+      delete window.matchMedia
+    }
   })
 })
 
@@ -199,6 +266,12 @@ describe('tracking a training day', () => {
     await user.click(screen.getByRole('button', { name: 'Track a training day' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Pull/ }))
     await user.click(screen.getByRole('button', { name: 'Leave' }))
+    // Other training days can't be edited meanwhile.
+    await expandCard(user, /^Push/)
+    const menu = await cardMenu(user, 'Push, Tue 20 Oct')
+    expect(menu.getByRole('menuitem', { name: 'Edit' })).toBeDisabled()
+    expect(menu.getByText('Finish the training day in progress to edit this one.')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
 
     expect(await repo.loadActive()).toMatchObject({ workout: { dayName: 'Pull' } })
     await user.click(screen.getByRole('button', { name: 'Resume: Pull' }))
@@ -212,13 +285,12 @@ describe('tracking a training day', () => {
   it('edits a saved workout in place', async () => {
     const { user, repo } = await renderApp()
     await expandCard(user, /^Pull/)
-    await user.click(screen.getByRole('button', { name: 'Details ›' }))
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click((await cardMenu(user, 'Pull, Thu 22 Oct')).getByRole('menuitem', { name: 'Edit' }))
     const reps = screen.getByLabelText('Set 1 reps')
     await user.clear(reps)
     await user.type(reps, '12')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
-    expect(screen.getByText('12 @ 50 kg')).toBeInTheDocument()
+    expect(screen.getByText('12 @ 50 kg')).toBeInTheDocument() // back home, the card open
     const workouts = (await repo.load()).workouts
     expect(workouts).toHaveLength(2)
     expect(workouts.find((w) => w.id === 'w-pull')!.entries[0].sets).toEqual([{ weight: 50, reps: 12 }])
@@ -424,12 +496,9 @@ describe('training day descriptions', () => {
     await user.click(screen.getByRole('button', { name: 'Finish' }))
     // The card of the day just saved is open, showing the description.
     expect(screen.getByText('Gym was packed')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Details ›' }))
-    expect(screen.getByRole('heading', { name: /Pull · Tue 27 Oct/ })).toBeInTheDocument()
-    expect(screen.getByText('Gym was packed')).toBeInTheDocument()
 
     // Clearing it while editing removes it.
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click((await cardMenu(user, 'Pull, Tue 27 Oct')).getByRole('menuitem', { name: 'Edit' }))
     await user.clear(screen.getByLabelText('Description'))
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     const saved = (await repo.load()).workouts.find((w) => w.date === '2026-10-27')!
@@ -683,5 +752,35 @@ describe('stats', () => {
     expect(screen.getByText(/No training days tracked yet/)).toBeInTheDocument()
     await openPage(user, 'Stats', 'Body weight')
     expect(screen.getByText(/No body weight yet/)).toBeInTheDocument()
+  })
+})
+
+describe('sets to failure', () => {
+  it('are ticked while tracking, not carried over, and marked with an f', async () => {
+    const { user, repo } = await renderApp()
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Push/ }))
+    await user.click(screen.getByLabelText('Set 2 to failure'))
+    expect(screen.getByLabelText('Set 2 to failure')).toBeChecked()
+    await user.click(screen.getByRole('button', { name: '+ Add set' }))
+    expect(screen.getByLabelText('Set 3 to failure')).not.toBeChecked() // a new set starts unticked
+    await user.click(screen.getByLabelText('Set 3 to failure'))
+    await user.click(screen.getByLabelText('Set 3 to failure')) // and untick again
+    await user.click(screen.getByRole('button', { name: 'Next ›' }))
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+
+    const saved = (await repo.load()).workouts.find((w) => w.date === '2026-10-27')!
+    expect(saved.entries[0].sets).toStrictEqual([
+      { weight: 60, reps: 10 },
+      { weight: 60, reps: 10, failure: true },
+      { weight: 60, reps: 10 },
+    ])
+    expect(screen.getByText('10 · 10f · 10 @ 60 kg')).toBeInTheDocument()
+
+    // Next time the sets are pre-filled, but without the ticks.
+    await user.click(screen.getByRole('button', { name: 'Track a training day' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Push/ }))
+    expect(screen.getByText('Last time (Tue 27 Oct): 10 · 10f · 10 @ 60 kg')).toBeInTheDocument()
+    expect(screen.getByLabelText('Set 2 to failure')).not.toBeChecked()
   })
 })

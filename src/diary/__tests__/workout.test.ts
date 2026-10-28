@@ -6,12 +6,15 @@ import {
   insertEntry,
   lastEntry,
   localDate,
+  newEntry,
+  nextSet,
   removeEntry,
   replaceEntry,
   setBodyWeight,
   setDescription,
   startWorkout,
   updateSets,
+  withFailure,
   type Diary,
 } from '..'
 
@@ -129,5 +132,20 @@ describe('finishWorkout', () => {
     expect(done.entries).toEqual([
       { exerciseId: 'bench', exerciseName: 'Bench press', sets: [{ weight: 62.5, reps: 8 }] },
     ])
+  })
+})
+
+describe('sets to failure', () => {
+  it('are marked and unmarked without leaving the field behind', () => {
+    const set = withFailure({ weight: 60, reps: 8 }, true)
+    expect(set).toEqual({ weight: 60, reps: 8, failure: true })
+    expect(withFailure(set, false)).toStrictEqual({ weight: 60, reps: 8 })
+  })
+
+  it('aren’t copied into the next set or the next time', () => {
+    expect(nextSet({ weight: 60, reps: 8, failure: true })).toStrictEqual({ weight: 60, reps: 8 })
+    const history = structuredClone(diary.workouts)
+    history[0].entries[0].sets[1].failure = true
+    expect(newEntry(bench, history).sets).toStrictEqual([{ weight: 60, reps: 10 }, { weight: 60, reps: 8 }])
   })
 })

@@ -22,7 +22,7 @@ Gym training diary PWA for personal use. The user creates exercises (with an opt
 - Changes made during a workout never modify the training day.
 - The workout in progress is persisted separately (`training-diary.active`), so closing the app mid-workout loses nothing.
 - Units: kg; dates are local `YYYY-MM-DD` strings. Number inputs accept a decimal comma.
-- Motion is CSS only (page entry animation keyed per navigation in `App.tsx`, tab bar in `NavBar.tsx`/`App.css`) and switched off under `prefers-reduced-motion`.
+- Motion is CSS only (page entry animation keyed per navigation in `App.tsx`, tab bar in `NavBar.tsx`/`App.css`, home cards unfolding via an animated grid row in `HomeScreen.tsx`/`App.css`) and switched off under `prefers-reduced-motion`.
 - Tabs: Training days, Library (Exercises / Plans) and Stats (Exercises / Plans / Body weight). A tab with several pages shows a glass menu at the top (`PageTabs.tsx`); tapping the tab opens its first page, holding it pops up all its pages (`NavBar.tsx`). The order lives in `PAGES` in `App.tsx`.
 - Gestures: swiping across a main screen steps to the neighbouring page, then tab (`hooks/useSwipe.ts`), and dragging along the tab bar moves its highlight (`NavBar.tsx`). Both skip fields, dialogs and sideways scrollers.
 

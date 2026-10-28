@@ -5,6 +5,7 @@ import {
   formatDate,
   formatDecimal,
   formatKg,
+  formatSet,
   formatVolume,
   parseNumber,
   setGroups,
@@ -34,6 +35,18 @@ describe('summarizeSets', () => {
     expect(summarizeSets([{ weight: 60, reps: 10 }, { weight: 60, reps: 10 }])).toBe('10 · 10 @ 60 kg')
     expect(summarizeSets([{ weight: 70, reps: 10 }, { weight: 70, reps: 8 }])).toBe('10 · 8 @ 70 kg')
     expect(summarizeSets([{ weight: 62.5, reps: 8 }])).toBe('8 @ 62.5 kg')
+  })
+
+  it('marks sets done to failure with an f', () => {
+    const sets = [
+      { weight: 50, reps: 12, failure: true },
+      { weight: 50, reps: 11 },
+      { weight: 50, reps: 8, failure: true },
+      { weight: 0, reps: 9, failure: true },
+    ]
+    expect(summarizeSets(sets)).toBe('12f · 11 · 8f @ 50 kg, 9f')
+    expect(formatSet(sets[0])).toBe('12f @ 50 kg')
+    expect(formatSet(sets[3])).toBe('9f reps')
   })
 
   it('has no weight for sets without one', () => {

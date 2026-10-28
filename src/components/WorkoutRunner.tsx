@@ -4,11 +4,13 @@ import {
   insertEntry,
   lastBodyWeight,
   lastEntry,
+  nextSet,
   removeEntry,
   replaceEntry,
   setBodyWeight,
   setDescription,
   updateSets,
+  withFailure,
   type ActiveWorkout,
   type Diary,
   type Exercise,
@@ -141,6 +143,9 @@ export function WorkoutRunner({
                 <th scope="col">Set</th>
                 <th scope="col">kg</th>
                 <th scope="col">Reps</th>
+                <th scope="col" className="failure-col">
+                  Failure
+                </th>
                 <th scope="col">
                   <span className="visually-hidden">Remove</span>
                 </th>
@@ -165,6 +170,15 @@ export function WorkoutRunner({
                       onChange={(reps) => changeSet(i, { reps: reps ?? 0 })}
                     />
                   </td>
+                  <td className="failure-col">
+                    <input
+                      type="checkbox"
+                      className="failure-box"
+                      aria-label={`Set ${i + 1} to failure`}
+                      checked={s.failure === true}
+                      onChange={(e) => setSets(entry.sets.map((x, j) => (j === i ? withFailure(x, e.target.checked) : x)))}
+                    />
+                  </td>
                   <td>
                     <button
                       type="button"
@@ -182,7 +196,7 @@ export function WorkoutRunner({
           <button
             type="button"
             className="add-set"
-            onClick={() => setSets([...entry.sets, { ...(entry.sets.at(-1) ?? { weight: 0, reps: 10 }) }])}
+            onClick={() => setSets([...entry.sets, nextSet(entry.sets.at(-1) ?? { weight: 0, reps: 10 })])}
           >
             + Add set
           </button>
