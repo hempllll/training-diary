@@ -58,6 +58,14 @@ async function renderApp(diary: Diary = seeded) {
 }
 
 const nav = () => screen.getByRole('navigation', { name: 'Main' })
+/** Open a page of a tab via its glass menu at the top, e.g. ('Library', 'Plans'). */
+async function openPage(user: ReturnType<typeof userEvent.setup>, tab: 'Library' | 'Stats', page: string) {
+  await user.click(within(nav()).getByRole('button', { name: new RegExp(tab) }))
+  const menu = screen.getByRole('navigation', { name: tab })
+  if (within(menu).getByRole('button', { current: 'page' }).textContent !== page) {
+    await user.click(within(menu).getByRole('button', { name: page }))
+  }
+}
 /** The plan names on the home screen's cards, top to bottom. */
 const workoutCards = () => [...document.querySelectorAll('.card-toggle .row-title')].map((t) => t.textContent)
 /** Open a home card by its plan name, e.g. /^Pull/. */
@@ -119,7 +127,7 @@ describe('header', () => {
 
   it('has + track a training day from any tab, or resume the one in progress', async () => {
     const { user } = await renderApp()
-    await user.click(within(nav()).getByRole('button', { name: /Exercises/ }))
+    await user.click(within(nav()).getByRole('button', { name: /Library/ }))
     await user.click(screen.getByRole('button', { name: 'Track a training day' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Pull/ }))
     await user.click(screen.getByRole('button', { name: 'Leave' }))
@@ -217,10 +225,10 @@ describe('tracking a training day', () => {
   })
 })
 
-describe('exercises tab', () => {
-  it('adds, shows progress, renames and deletes', async () => {
+describe('library: exercises', () => {
+  it('adds, shows last time, renames and deletes', async () => {
     const { user, repo } = await renderApp()
-    await user.click(within(nav()).getByRole('button', { name: /Exercises/ }))
+    await user.click(within(nav()).getByRole('button', { name: /Library/ }))
 
     await user.type(screen.getByLabelText('New exercise name'), 'bench press')
     await user.click(screen.getByRole('button', { name: 'Add' }))
@@ -231,9 +239,7 @@ describe('exercises tab', () => {
 
     await user.click(screen.getByText('Bench press'))
     expect(screen.getByText('In plans: Push')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Top weight over time, 1 workouts' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Est. 1RM' }))
-    expect(screen.getByText('Best est. 1rm: 80 kg (Tue 20 Oct)')).toBeInTheDocument()
+    expect(screen.getByText('Last time (Tue 20 Oct): 10 · 10 @ 60 kg')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     await user.clear(screen.getByLabelText('Name'))
@@ -257,12 +263,12 @@ describe('exercises tab', () => {
   })
 })
 
-describe('plans tab', () => {
+describe('library: plans', () => {
   it('creates a plan from scratch, ordering its exercises', async () => {
     const { user, repo } = await renderApp({ exercises: [], days: [], workouts: [] })
     expect(screen.getByText(/Create a plan/)).toBeInTheDocument()
-    await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
-    await user.click(screen.getByRole('button', { name: '+ New' }))
+    await openPage(user, 'Library', 'Plans')
+    await user.click(screen.getByRole('button', { name: '+ New plan' }))
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByText('Enter a name.')).toBeInTheDocument()
@@ -285,7 +291,7 @@ describe('plans tab', () => {
 
   it('removes an exercise from a plan and cancels without saving', async () => {
     const { user, repo } = await renderApp()
-    await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
+    await openPage(user, 'Library', 'Plans')
     await user.click(screen.getByText('Push'))
     await user.click(screen.getByRole('button', { name: 'Remove Bench press' }))
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -360,7 +366,7 @@ describe('data stored by an earlier version', () => {
       'Pull', 'Legs', 'Push', // tracked training days, newest first
     ])
 
-    await user.click(within(nav()).getByRole('button', { name: /Exercises/ }))
+    await user.click(within(nav()).getByRole('button', { name: /Library/ }))
     await user.click(screen.getByText('Dips'))
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     await user.type(screen.getByLabelText('Description'), 'Use the belt')
@@ -388,8 +394,8 @@ describe('data stored by an earlier version', () => {
 describe('rest days', () => {
   it('are plans without exercises, tracked with body weight and a description', async () => {
     const { user, repo } = await renderApp()
-    await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
-    await user.click(screen.getByRole('button', { name: '+ New' }))
+    await openPage(user, 'Library', 'Plans')
+    await user.click(screen.getByRole('button', { name: '+ New plan' }))
     await user.type(screen.getByPlaceholderText('e.g. Push, or Rest day'), 'Rest day')
     expect(screen.getByText('No exercises: tracking this plan records a rest day.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -436,19 +442,24 @@ describe('page transitions', () => {
     const { user } = await renderApp()
     const motion = () => document.querySelector('.page')?.getAttribute('data-motion')
     expect(motion()).toBe('fade')
-    await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
+    await openPage(user, 'Library', 'Plans')
     expect(motion()).toBe('next-tab')
-    await user.click(within(nav()).getByRole('button', { name: /Exercises/ }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Library' })).getByRole('button', { name: 'Exercises' }))
     expect(motion()).toBe('prev-tab')
     await user.click(screen.getByText('Bench press'))
     expect(motion()).toBe('forward')
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(motion()).toBe('back')
+    await user.click(screen.getByText('Bench press'))
+    await user.click(screen.getByRole('button', { name: 'Stats ›' })) // on to the next tab
+    expect(motion()).toBe('next-tab')
   })
 })
 
 describe('swiping between tabs', () => {
   const current = () => within(nav()).getByRole('button', { current: 'page' }).textContent
+  /** The page shown in the glass menu at the top, if the tab has one. */
+  const page = () => document.querySelector('.page-tabs [aria-current="page"]')?.textContent
   const swipe = (el: Element, from: number, to: number, dy = 0) => {
     fireEvent.touchStart(el, { touches: [{ clientX: from, clientY: 300 }] })
     fireEvent.touchEnd(el, { changedTouches: [{ clientX: to, clientY: 300 + dy }] })
@@ -457,19 +468,28 @@ describe('swiping between tabs', () => {
   it('moves to the neighbouring tab across the screen', async () => {
     const { user } = await renderApp()
     const main = () => screen.getByRole('main')
-    swipe(main(), 300, 100)
-    expect(current()).toBe('Exercises')
-    swipe(main(), 300, 100)
-    expect(current()).toBe('Plans')
-    swipe(main(), 300, 100) // no tab after Plans
-    expect(current()).toBe('Plans')
-    swipe(main(), 100, 300)
-    expect(current()).toBe('Exercises')
+    // Through every page of every tab, in order.
+    const seen = [[current(), page()]]
+    for (let i = 0; i < 6; i++) {
+      swipe(main(), 300, 100)
+      seen.push([current(), page()])
+    }
+    expect(seen).toEqual([
+      ['Training days', undefined],
+      ['Library', 'Exercises'],
+      ['Library', 'Plans'],
+      ['Stats', 'Exercises'],
+      ['Stats', 'Plans'],
+      ['Stats', 'Body weight'],
+      ['Stats', 'Body weight'], // nothing after it
+    ])
+    for (let i = 0; i < 4; i++) swipe(main(), 100, 300)
+    expect([current(), page()]).toEqual(['Library', 'Exercises'])
 
     swipe(main(), 300, 250) // too short
     swipe(main(), 300, 100, 200) // mostly scrolling
     swipe(screen.getByRole('textbox', { name: 'New exercise name' }), 300, 100) // in a field
-    expect(current()).toBe('Exercises')
+    expect(page()).toBe('Exercises')
 
     // Opened screens don't switch tabs.
     await user.click(screen.getByText('Bench press'))
@@ -487,7 +507,7 @@ describe('swiping between tabs', () => {
     expect(bar.style.getPropertyValue('--tab')).toBe('1')
     fireEvent.pointerMove(bar, { clientX: 260, pointerId: 1 })
     fireEvent.pointerUp(bar, { clientX: 260, pointerId: 1 })
-    expect(current()).toBe('Plans')
+    expect(current()).toBe('Stats')
     expect(bar).not.toHaveClass('dragging')
   })
 })
@@ -499,8 +519,8 @@ describe('notifications', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { user } = await renderApp()
     const saveRestDay = async (name: string) => {
-      await user.click(within(nav()).getByRole('button', { name: /Plans/ }))
-      await user.click(screen.getByRole('button', { name: '+ New' }))
+      await openPage(user, 'Library', 'Plans')
+      await user.click(screen.getByRole('button', { name: '+ New plan' }))
       await user.type(screen.getByPlaceholderText('e.g. Push, or Rest day'), name)
       await user.click(screen.getByRole('button', { name: 'Save' }))
     }
@@ -518,5 +538,148 @@ describe('notifications', () => {
     await saveRestDay('Stretch')
     await user.click(screen.getByRole('status'))
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
+describe('tabs with several pages', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('open their first page on a tap and switch pages in the glass menu', async () => {
+    const { user } = await renderApp()
+    await user.click(within(nav()).getByRole('button', { name: /Library/ }))
+    const menu = screen.getByRole('navigation', { name: 'Library' })
+    expect(within(menu).getByRole('button', { current: 'page' })).toHaveTextContent('Exercises')
+    await user.click(within(menu).getByRole('button', { name: 'Plans' }))
+    expect(screen.getByRole('button', { name: '+ New plan' })).toBeInTheDocument()
+    // Tapping the tab again goes back to its first page.
+    await user.click(within(nav()).getByRole('button', { name: /Library/ }))
+    expect(screen.getByLabelText('New exercise name')).toBeInTheDocument()
+    // Opened screens have a back button instead of the menu.
+    await user.click(screen.getByText('Bench press'))
+    expect(screen.queryByRole('navigation', { name: 'Library' })).not.toBeInTheDocument()
+  })
+
+  it('offer their pages when the tab is held', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { user } = await renderApp()
+    const stats = within(nav()).getByRole('button', { name: /Stats/ })
+    fireEvent.pointerDown(stats, { clientX: 250, pointerId: 1 })
+    act(() => vi.advanceTimersByTime(300))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument() // not held long enough yet
+    act(() => vi.advanceTimersByTime(300))
+    fireEvent.pointerUp(stats, { clientX: 250, pointerId: 1 })
+    fireEvent.click(stats) // the click that ends the hold doesn't open the tab
+    expect(within(nav()).getByRole('button', { current: 'page' })).toHaveTextContent('Training days')
+    const menu = screen.getByRole('menu', { name: 'Stats' })
+    expect(within(menu).getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Exercises', 'Plans', 'Body weight'])
+    // Lifting the finger can land a click on the backdrop; that keeps it open.
+    fireEvent.click(document.querySelector('.menu-backdrop')!)
+    await user.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Body weight' }))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    const pages = screen.getByRole('navigation', { name: 'Stats' })
+    expect(within(pages).getByRole('button', { current: 'page' })).toHaveTextContent('Body weight')
+
+    // A right click (or a long press the browser reports) opens it too; a
+    // tap elsewhere closes it, and the tab without pages has none.
+    fireEvent.contextMenu(within(nav()).getByRole('button', { name: /Library/ }))
+    expect(within(screen.getByRole('menu', { name: 'Library' })).getAllByRole('menuitem')).toHaveLength(2)
+    await user.click(document.querySelector('.menu-backdrop')!)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    fireEvent.contextMenu(within(nav()).getByRole('button', { name: /Training days/ }))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+})
+
+describe('stats', () => {
+  const diary = structuredClone(seeded)
+  diary.workouts[0].bodyWeight = 82
+  diary.workouts.push({
+    id: 'w-push-2',
+    dayId: 'push',
+    dayName: 'Push',
+    date: '2026-10-26',
+    startedAt: '2026-10-26T17:00:00.000Z',
+    bodyWeight: 81,
+    entries: [
+      { exerciseId: 'bench', exerciseName: 'Bench press', sets: [{ weight: 70, reps: 5 }, { weight: 62.5, reps: 9 }] },
+      { exerciseId: 'dips', exerciseName: 'Dips', sets: [{ weight: 0, reps: 12 }], extra: true },
+    ],
+  })
+  /** A stat tile's value (and second line) by its label. */
+  const tile = (label: string, inside: HTMLElement = document.body) =>
+    within(inside).getByText(label, { selector: 'dt' }).nextElementSibling
+
+  it('show an exercise’s weight for a rep range, totals and history', async () => {
+    const { user } = await renderApp(diary)
+    await user.click(within(nav()).getByRole('button', { name: /Stats/ }))
+    // Starts with the exercise done most recently.
+    const exercise = screen.getByRole('combobox', { name: 'Exercise' })
+    expect(exercise).toHaveDisplayValue('Bench press')
+    expect(screen.getByRole('img', { name: 'Heaviest set with 8–12 reps over time, 2 values' })).toBeInTheDocument()
+    expect(screen.getByText('Best: 62.5 kg with 8–12 reps.')).toBeInTheDocument()
+    expect(tile('Heaviest set')).toHaveTextContent('5 @ 70 kgMon 26 Oct')
+    expect(tile('Done')).toHaveTextContent('2×')
+    expect(screen.getByText('5 @ 70 kg, 9 @ 62.5 kg')).toBeInTheDocument() // history
+
+    await user.clear(screen.getByLabelText('Fewest reps'))
+    await user.type(screen.getByLabelText('Fewest reps'), '1')
+    await user.clear(screen.getByLabelText('Most reps'))
+    await user.type(screen.getByLabelText('Most reps'), '5')
+    expect(screen.getByRole('img', { name: 'Heaviest set with 1–5 reps over time, 1 values' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '1M' }))
+    expect(screen.getByRole('button', { name: '1M' })).toHaveAttribute('aria-pressed', 'true')
+
+    // Deleted exercises stay in the list; without weight, reps are charted.
+    await user.selectOptions(exercise, 'Dips (deleted)')
+    expect(screen.getByRole('img', { name: 'Most reps over time, 1 values' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Fewest reps')).not.toBeInTheDocument()
+
+    // The choices stay when coming back.
+    await user.click(within(nav()).getByRole('button', { name: /Training days/ }))
+    await user.click(within(nav()).getByRole('button', { name: /Stats/ }))
+    expect(screen.getByRole('combobox', { name: 'Exercise' })).toHaveDisplayValue('Dips (deleted)')
+  })
+
+  it('open from an exercise in the library', async () => {
+    const { user } = await renderApp(diary)
+    await user.click(within(nav()).getByRole('button', { name: /Library/ }))
+    await user.click(screen.getByText('Barbell row'))
+    await user.click(screen.getByRole('button', { name: 'Stats ›' }))
+    expect(screen.getByRole('combobox', { name: 'Exercise' })).toHaveDisplayValue('Barbell row')
+    expect(screen.getByText('10 @ 50 kg', { selector: '.row-sub' })).toBeInTheDocument() // history
+  })
+
+  it('show how often each plan is done', async () => {
+    const { user } = await renderApp(diary)
+    await openPage(user, 'Stats', 'Plans')
+    expect(tile('Training days')).toHaveTextContent('3tracked')
+    expect(tile('This week')).toHaveTextContent('1since Monday')
+    expect(tile('Per week', document.querySelector<HTMLElement>('.stat-grid')!)).toHaveTextContent('1.5×in 2 weeks')
+    const push = screen.getByRole('heading', { name: 'Push' }).closest('li')!
+    expect(tile('Done', push)).toHaveTextContent('2×since Tue 20 Oct')
+    expect(tile('Every', push)).toHaveTextContent('6 days')
+    expect(tile('Swaps', push)).toHaveTextContent('1')
+  })
+
+  it('chart body weight with its 7-day average', async () => {
+    const { user } = await renderApp(diary)
+    await openPage(user, 'Stats', 'Body weight')
+    expect(screen.getByRole('img', { name: 'Body weight over time, 2 values' })).toBeInTheDocument()
+    // 20 Oct is seven days before today (27 Oct), so outside the average.
+    expect(tile('Last 7 days')).toHaveTextContent('81 kgaverage')
+    expect(tile('Change')).toHaveTextContent('−1 kg')
+    expect(document.querySelector('.chart-legend')).toHaveTextContent('Body weight 7-day average')
+    await user.click(screen.getByRole('button', { name: '7-day average' }))
+    expect(document.querySelector('.chart-legend')).not.toBeInTheDocument()
+  })
+
+  it('explain what is missing on an empty diary', async () => {
+    const { user } = await renderApp({ exercises: [], days: [], workouts: [] })
+    await user.click(within(nav()).getByRole('button', { name: /Stats/ }))
+    expect(screen.getByText(/No exercises yet/)).toBeInTheDocument()
+    await openPage(user, 'Stats', 'Plans')
+    expect(screen.getByText(/No training days tracked yet/)).toBeInTheDocument()
+    await openPage(user, 'Stats', 'Body weight')
+    expect(screen.getByText(/No body weight yet/)).toBeInTheDocument()
   })
 })

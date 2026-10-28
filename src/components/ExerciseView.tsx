@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { METRICS, nameError, progressFor, type Diary, type Exercise, type Metric } from '../diary'
-import { formatDate, formatKg, summarizeSets } from '../ui/format'
+import { lastEntry, nameError, type Diary, type Exercise } from '../diary'
+import { formatDate, summarizeSets } from '../ui/format'
 import { ConfirmButton } from './ConfirmButton'
-import { ProgressChart } from './ProgressChart'
 
 interface ExerciseViewProps {
   exercise: Exercise
@@ -10,22 +9,18 @@ interface ExerciseViewProps {
   onBack: () => void
   onSave: (changes: { name: string; description: string }) => void
   onDelete: () => void
+  /** Open this exercise's progress in the Stats tab. */
+  onShowStats: () => void
 }
 
-/** One exercise: its description, progress chart, full history, edit and delete. */
-export function ExerciseView({ exercise, diary, onBack, onSave, onDelete }: ExerciseViewProps) {
-  const [metric, setMetric] = useState<Metric>('top')
+/** One exercise: its description, plans, last time, edit and delete. Progress is in Stats. */
+export function ExerciseView({ exercise, diary, onBack, onSave, onDelete, onShowStats }: ExerciseViewProps) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(exercise.name)
   const [description, setDescription] = useState(exercise.description ?? '')
   const [error, setError] = useState<string | null>(null)
 
-  const points = progressFor(diary.workouts, exercise.id)
-  const metricInfo = METRICS.find((m) => m.id === metric)!
-  const best = points.reduce<(typeof points)[number] | null>(
-    (a, p) => (a === null || p[metric] > a[metric] ? p : a),
-    null,
-  )
+  const last = lastEntry(diary.workouts, exercise.id)
   const usedIn = diary.days.filter((d) => d.exerciseIds.includes(exercise.id))
 
   function save() {
@@ -107,39 +102,17 @@ export function ExerciseView({ exercise, diary, onBack, onSave, onDelete }: Exer
           : 'Not in any plan.'}
       </p>
 
-      {points.length === 0 ? (
-        <p className="notice">Not tracked yet. Its progress will show up here.</p>
-      ) : (
+      {last ? (
         <>
-          <div className="segmented" role="group" aria-label="Measure">
-            {METRICS.map((m) => (
-              <button key={m.id} type="button" aria-pressed={m.id === metric} onClick={() => setMetric(m.id)}>
-                {m.label}
-              </button>
-            ))}
-          </div>
-          <ProgressChart points={points} metric={metric} label={metricInfo.label} unit={metricInfo.unit} />
-          {best && (
-            <p className="notice">
-              Best {metricInfo.label.toLowerCase()}: {formatKg(best[metric])} {metricInfo.unit} (
-              {formatDate(best.date)})
-            </p>
-          )}
-
-          <h3 className="section-title">History</h3>
-          <ul className="list">
-            {[...points].reverse().map((p) => (
-              <li key={p.workoutId} className="row static">
-                <span className="row-main">
-                  <span className="row-title">
-                    {formatDate(p.date)} <span className="muted">· {p.dayName}</span>
-                  </span>
-                  <span className="row-sub">{summarizeSets(p.sets)}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <p className="notice">
+            Last time ({formatDate(last.workout.date)}): {summarizeSets(last.entry.sets)}
+          </p>
+          <button type="button" className="card-open" onClick={onShowStats}>
+            Stats ›
+          </button>
         </>
+      ) : (
+        <p className="notice">Not tracked yet. Its progress will show up in Stats.</p>
       )}
 
       <div className="actions end">

@@ -1,4 +1,4 @@
-import type { SetEntry } from '../diary'
+import { dayNumber, type SetEntry } from '../diary'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -14,6 +14,29 @@ export function formatDate(date: string, currentYear = new Date().getFullYear())
 /** A weight without trailing zeros: 60, 62.5, 0.25. */
 export function formatKg(kg: number): string {
   return String(Math.round(kg * 100) / 100)
+}
+
+/** A number with at most `digits` decimals: 82.4, 1.5, 3. */
+export function formatDecimal(n: number, digits = 1): string {
+  const f = 10 ** digits
+  return String(Math.round(n * f) / f)
+}
+
+/** A change in kg with its sign: "+1.2 kg", "−0.8 kg", "±0 kg". */
+export function formatChange(kg: number): string {
+  const text = formatDecimal(Math.abs(kg))
+  return `${text === '0' ? '±' : kg > 0 ? '+' : '−'}${text} kg`
+}
+
+/** Total weight moved: kg up to 10 t, then tonnes ("12.3 t"). */
+export function formatVolume(kg: number): string {
+  return kg < 10_000 ? `${Math.round(kg)} kg` : `${formatDecimal(kg / 1000)} t`
+}
+
+/** How long ago `date` was: "today", "yesterday", "3 days ago". */
+export function daysAgo(date: string, today: string): string {
+  const days = dayNumber(today) - dayNumber(date)
+  return days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`
 }
 
 /**

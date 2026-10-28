@@ -2,4 +2,4 @@
 export * from './types'
 export * from './diary'
 export * from './workout'
-export * from './progress'
+export * from './stats'

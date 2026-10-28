@@ -14,12 +14,10 @@ export function DaysScreen({ diary, onAdd, onEdit }: DaysScreenProps) {
 
   return (
     <section className="screen">
-      <div className="view-header">
-        <h2>Plans</h2>
-        <button type="button" className="primary" onClick={onAdd}>
-          + New
-        </button>
-      </div>
+      <h2 className="visually-hidden">Plans</h2>
+      <button type="button" className="new-plan" onClick={onAdd}>
+        + New plan
+      </button>
 
       {diary.days.length === 0 ? (
         <p className="notice">

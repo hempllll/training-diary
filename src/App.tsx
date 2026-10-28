@@ -4,15 +4,21 @@ import { AppHeader } from './components/AppHeader'
 import { BackupDialog } from './components/BackupDialog'
 import { DayEditor } from './components/DayEditor'
 import { DaysScreen } from './components/DaysScreen'
+import { ExerciseStatsScreen } from './components/ExerciseStatsScreen'
 import { ExercisesScreen } from './components/ExercisesScreen'
 import { ExerciseView } from './components/ExerciseView'
 import { HomeScreen } from './components/HomeScreen'
 import { LoadErrorScreen } from './components/LoadErrorScreen'
-import { NavBar, type Tab } from './components/NavBar'
+import { NavBar } from './components/NavBar'
+import { PageTabs } from './components/PageTabs'
 import { PlanChooser } from './components/PlanChooser'
+import { PlanStatsScreen } from './components/PlanStatsScreen'
+import { TAB_LABELS, type Tab } from './components/tabs'
+import { WeightStatsScreen } from './components/WeightStatsScreen'
 import { WorkoutRunner } from './components/WorkoutRunner'
 import { WorkoutView } from './components/WorkoutView'
 import {
+  DEFAULT_REP_RANGE,
   deleteDay,
   deleteExercise,
   deleteWorkout,
@@ -25,6 +31,8 @@ import {
   saveWorkout,
   startWorkout,
   type Exercise,
+  type RepRange,
+  type Span,
   type TrainingDay,
 } from './diary'
 import { useDiary } from './hooks/useDiary'
@@ -48,21 +56,41 @@ type View =
   | { name: 'days' }
   /** `back` is where Save and Cancel return to. */
   | { name: 'day'; id: string | null; back: View }
+  | { name: 'exercise-stats' }
+  | { name: 'plan-stats' }
+  | { name: 'weight-stats' }
+
+/**
+ * Each tab's main screens, in the order of its glass menu at the top of the
+ * page. Tapping the tab opens the first; holding it offers them all.
+ */
+const PAGES: Record<Tab, { view: View; label: string }[]> = {
+  home: [{ view: { name: 'home' }, label: 'Training days' }],
+  library: [
+    { view: { name: 'exercises' }, label: 'Exercises' },
+    { view: { name: 'days' }, label: 'Plans' },
+  ],
+  stats: [
+    { view: { name: 'exercise-stats' }, label: 'Exercises' },
+    { view: { name: 'plan-stats' }, label: 'Plans' },
+    { view: { name: 'weight-stats' }, label: 'Body weight' },
+  ],
+}
+const TAB_ORDER = Object.keys(PAGES) as Tab[]
+/** Every main screen, tab by tab: swiping steps through them in this order. */
+const MAIN_VIEWS = TAB_ORDER.flatMap((tab) => PAGES[tab].map((p) => p.view))
 
 const TAB_OF: Record<View['name'], Tab> = {
   home: 'home',
   workout: 'home',
   run: 'home',
-  exercises: 'exercises',
-  exercise: 'exercises',
-  days: 'days',
-  day: 'days',
-}
-
-const TAB_VIEW: Record<Tab, View> = {
-  home: { name: 'home' },
-  exercises: { name: 'exercises' },
-  days: { name: 'days' },
+  exercises: 'library',
+  exercise: 'library',
+  days: 'library',
+  day: 'library',
+  'exercise-stats': 'stats',
+  'plan-stats': 'stats',
+  'weight-stats': 'stats',
 }
 
 // --- page transitions ------------------------------------------------------
@@ -79,15 +107,24 @@ const DEPTH: Record<View['name'], number> = {
   run: 1,
   exercise: 1,
   day: 1,
+  'exercise-stats': 0,
+  'plan-stats': 0,
+  'weight-stats': 0,
 }
-const TAB_ORDER: Tab[] = ['home', 'exercises', 'days']
+
+/** Where a screen is in `MAIN_VIEWS`; an opened screen counts as its tab's first. */
+function orderOf(view: View): number {
+  const name = DEPTH[view.name] === 0 ? view.name : PAGES[TAB_OF[view.name]][0].view.name
+  return MAIN_VIEWS.findIndex((v) => v.name === name)
+}
 
 /** Opening a screen slides in from the right, going back from the left, and
- * switching tabs slides towards the tab's side of the bar. */
+ * switching tabs or pages slides towards their side of the bar or menu. */
 function motionBetween(from: View, to: View): Motion {
   const deeper = DEPTH[to.name] - DEPTH[from.name]
-  if (deeper !== 0) return deeper > 0 ? 'forward' : 'back'
-  const step = TAB_ORDER.indexOf(TAB_OF[to.name]) - TAB_ORDER.indexOf(TAB_OF[from.name])
+  if (deeper > 0) return 'forward'
+  if (deeper < 0 && TAB_OF[to.name] === TAB_OF[from.name]) return 'back'
+  const step = orderOf(to) - orderOf(from)
   return step > 0 ? 'next-tab' : step < 0 ? 'prev-tab' : 'fade'
 }
 
@@ -113,6 +150,15 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [backupOpen, setBackupOpen] = useState(false)
   const [choosing, setChoosing] = useState(false)
+  // Choices on the Stats pages, kept while moving around the app.
+  const [stats, setStats] = useState({
+    exerciseId: null as string | null,
+    reps: DEFAULT_REP_RANGE as RepRange,
+    exerciseSpan: 'all' as Span,
+    weightSpan: '3m' as Span,
+    average: true,
+  })
+  const changeStats = (changes: Partial<typeof stats>) => setStats((cur) => ({ ...cur, ...changes }))
   // A short notification ("Saved Push"); `seq` restarts it when a new one
   // replaces one still showing.
   const [toast, setToast] = useState<{ text: string; seq: number } | null>(null)
@@ -130,7 +176,7 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
   }
 
   function selectTab(tab: Tab) {
-    navigate(TAB_VIEW[tab])
+    navigate(PAGES[tab][0].view)
   }
 
   function notify(text: string) {
@@ -143,10 +189,11 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
     return () => clearTimeout(timer)
   }, [toast])
 
-  // On a tab's main screen, swiping across it moves to the neighbouring tab.
+  // On a main screen, swiping across it moves to the neighbouring one (the
+  // next page of the tab, or the next tab).
   const swipe = useSwipe((step) => {
-    const next = TAB_ORDER[TAB_ORDER.indexOf(TAB_OF[view.name]) + step]
-    if (next) selectTab(next)
+    const next = MAIN_VIEWS[orderOf(view) + step]
+    if (next) navigate(next)
   })
 
   if (loadError) return <LoadErrorScreen error={loadError} today={localDate(now())} />
@@ -255,6 +302,10 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
               notify(`Deleted ${exercise.name}.`)
               navigate({ name: 'exercises' })
             }}
+            onShowStats={() => {
+              changeStats({ exerciseId: exercise.id })
+              navigate({ name: 'exercise-stats' })
+            }}
           />
         )
       }
@@ -290,6 +341,34 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
         />
       )
     }
+    const today = localDate(now())
+    if (view.name === 'exercise-stats') {
+      return (
+        <ExerciseStatsScreen
+          diary={d}
+          today={today}
+          exerciseId={stats.exerciseId}
+          onExerciseChange={(exerciseId) => changeStats({ exerciseId })}
+          range={stats.reps}
+          onRangeChange={(reps) => changeStats({ reps })}
+          span={stats.exerciseSpan}
+          onSpanChange={(exerciseSpan) => changeStats({ exerciseSpan })}
+        />
+      )
+    }
+    if (view.name === 'plan-stats') return <PlanStatsScreen diary={d} today={today} />
+    if (view.name === 'weight-stats') {
+      return (
+        <WeightStatsScreen
+          diary={d}
+          today={today}
+          span={stats.weightSpan}
+          onSpanChange={(weightSpan) => changeStats({ weightSpan })}
+          showAverage={stats.average}
+          onShowAverageChange={(average) => changeStats({ average })}
+        />
+      )
+    }
     if (view.name === 'days') {
       return (
         <DaysScreen
@@ -316,6 +395,8 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
 
   // Full-screen flows hide the tab bar so a stray tap can't leave them.
   const focused = (view.name === 'run' && active !== null) || view.name === 'day'
+  const tab = TAB_OF[view.name]
+  const pages = PAGES[tab]
 
   return (
     <div className={focused ? 'app' : 'app has-tab-bar'}>
@@ -336,13 +417,31 @@ function App({ repo: repoProp, now = () => new Date() }: AppProps) {
       )}
 
       <main {...(DEPTH[view.name] === 0 ? swipe : {})}>
+        {DEPTH[view.name] === 0 && pages.length > 1 && (
+          <PageTabs
+            key={tab}
+            label={TAB_LABELS[tab]}
+            pages={pages.map((p) => ({ id: p.view.name, label: p.label }))}
+            current={view.name}
+            onSelect={(name) => navigate(pages.find((p) => p.view.name === name)!.view)}
+          />
+        )}
         <div key={nav.seq} className="page" data-motion={nav.motion}>
           {renderScreen(diary)}
         </div>
       </main>
 
       {!focused && (
-        <NavBar tab={TAB_OF[view.name]} onSelect={selectTab} />
+        <NavBar
+          tab={tab}
+          onSelect={selectTab}
+          pages={Object.fromEntries(
+            TAB_ORDER.filter((t) => PAGES[t].length > 1).map((t) => [
+              t,
+              PAGES[t].map((p) => ({ label: p.label, onSelect: () => navigate(p.view) })),
+            ]),
+          )}
+        />
       )}
 
       {choosing && <PlanChooser days={diary.days} onChoose={handleStart} onClose={() => setChoosing(false)} />}
