@@ -25,6 +25,8 @@
   /* Progress chart line, checked for contrast and lightness against the
      surface in each mode (the dark one is a separate step, not a flip). */
   --chart-line: #0b6bcb;
+  /* Single weigh-ins behind the 7-day average: the line's hue, stepped back. */
+  --chart-faint: #9cc3ea;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -43,6 +45,7 @@
     --glass-selected: rgb(255 255 255 / 0.14);
     --glass-lens: rgb(255 255 255 / 0.2);
     --chart-line: #3f95ee;
+    --chart-faint: #2e5a86;
   }
 }
 

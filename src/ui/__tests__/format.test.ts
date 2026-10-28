@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatKg, parseNumber, setGroups, summarizeSets } from '../format'
+import {
+  daysAgo,
+  formatChange,
+  formatDate,
+  formatDecimal,
+  formatKg,
+  formatVolume,
+  parseNumber,
+  setGroups,
+  summarizeSets,
+} from '../format'
 import { niceTicks } from '../ticks'
 
 describe('formatDate', () => {
@@ -62,5 +72,24 @@ describe('niceTicks', () => {
     const ticks = niceTicks(60, 60)
     expect(ticks[0]).toBeLessThan(60)
     expect(ticks.at(-1)).toBeGreaterThan(60)
+  })
+})
+
+describe('stats numbers', () => {
+  it('round, sign and shorten', () => {
+    expect(formatDecimal(82.36)).toBe('82.4')
+    expect(formatDecimal(1.5)).toBe('1.5')
+    expect(formatDecimal(3)).toBe('3')
+    expect(formatChange(1.24)).toBe('+1.2 kg')
+    expect(formatChange(-0.8)).toBe('−0.8 kg')
+    expect(formatChange(0.01)).toBe('±0 kg')
+    expect(formatVolume(9_876.4)).toBe('9876 kg')
+    expect(formatVolume(12_345)).toBe('12.3 t')
+  })
+
+  it('say how long ago a date was', () => {
+    expect(daysAgo('2026-10-28', '2026-10-28')).toBe('today')
+    expect(daysAgo('2026-10-27', '2026-10-28')).toBe('yesterday')
+    expect(daysAgo('2026-09-28', '2026-10-28')).toBe('30 days ago')
   })
 })

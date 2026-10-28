@@ -23,7 +23,7 @@ export function ExercisesScreen({ diary, onAdd, onOpen }: ExercisesScreenProps) 
 
   return (
     <section className="screen">
-      <h2 className="screen-title">Exercises</h2>
+      <h2 className="visually-hidden">Exercises</h2>
       <form
         className="search"
         onSubmit={(e) => {
